@@ -131,33 +131,31 @@ namespace Bson.HilbertIndex
         }
 
         /// <summary>
-        /// Get ranges of hilbert indices within the specified bounding box.
+        /// Get ranges of hilbert indices within the specified envelope.
         /// Those ranges can be used for constructing range queries.
         /// </summary>
-        /// <param name="bounds">bounding box to get hilbert indices for</param>
+        /// <param name="envelope">Envelope  to get hilbert indices for</param>
         /// <param name="maxRanges">
         /// max number of returned ranges. 
         /// Number less than zero will return as many ranges required to cover the box with no overlapp.
         /// If greater than zero, the ranges closest to each other will be joined as one until the total number of ranges is less than the specifies maxRange parameter. 
         /// The smaller number, the larger will the bounding box be. 128 is a good number to keep good precision.
         /// </param>
-        /// <returns>ranges of hilbert indices covering the bounding box.</returns>
-        public ulong[][] GetRanges(Envelope bounds, int maxRanges = DefaultRangeCompactation)
-        {
-            var box = BoundingBoxToHilbertBox(bounds);
-            return GetRanges(box, maxRanges);
-        }
+        /// <returns>ranges of hilbert indices covering the envelope.</returns>
+        public ulong[][] GetRanges(Envelope envelope, int maxRanges = DefaultRangeCompactation)
+            => GetRanges(hilbertEnvelope: EnvelopeToHilbertEnvelope(envelope), maxRanges);
+        
 
         /// <summary>
-        /// Get ranges of hilbert indices within the  given bounding box. 
+        /// Get ranges of hilbert indices within the  given hilbert enveloper. 
         /// </summary>
         /// <param name="x">x coordinate of lower left corner</param>
         /// <param name="y">y coordinate of lower left corner</param>
         /// <param name="p">height of the box</param>
         /// <param name="q">width of the box</param>
         /// <returns></returns>
-        public ulong[][] GetRanges(HilbertEnvelope box, int maxRanges = DefaultRangeCompactation)
-            => GetRange('A', box, maxRanges);
+        public ulong[][] GetRanges(HilbertEnvelope hilbertEnvelope, int maxRanges = DefaultRangeCompactation)
+            => GetRange('A', hilbertEnvelope, maxRanges);
         
 
         /// <summary>
@@ -165,25 +163,25 @@ namespace Bson.HilbertIndex
         /// </summary>
         /// <param name="ranges">array of size [n][2]</param>
         /// <returns>bounding box</returns>
-        public Envelope GetBoundingBoxForRanges(ulong[][] ranges)
+        public Envelope RangesToEnvelope(ulong[][] ranges)
         {
-            Envelope box = null;
+            Envelope envelope = null;
             for (int r = 0; r < ranges.Length; r++)
             {
                 Coordinate first = Decode(ranges[r][0]);
                 Coordinate last = Decode(ranges[r][1]);
 
-                if (box == null)
+                if (envelope == null)
                 {
-                    box = new Envelope(minX: first.X, maxX: first.X, minY: first.Y, maxY: first.Y)
+                    envelope = new Envelope(minX: first.X, maxX: first.X, minY: first.Y, maxY: first.Y)
                         .Expand(last);
                 }
                 else
                 {
-                    box = box.Expand(first).Expand(last);
+                    envelope = envelope.Expand(first).Expand(last);
                 }
             }
-            return box;
+            return envelope;
         }
 
         private HilbertEnvelope CreateBox1D(ulong center, ulong other)
@@ -254,39 +252,36 @@ namespace Bson.HilbertIndex
         /// Create a hilbert box from a bounding box.
         /// The hilbert box is represenmteed by a point (x,y) in hilbert coordinate system placed at the lower left corner with height (p) and width (q)
         /// </summary> 
-        /// <param name="bounds"></param>
+        /// <param name="envelope"></param>
         /// <param name="x"></param>
         /// <param name="y"></param>
         /// <param name="p"></param>
         /// <param name="q"></param>
-        private HilbertEnvelope BoundingBoxToHilbertBox(Envelope bounds)
+        private HilbertEnvelope EnvelopeToHilbertEnvelope(Envelope envelope)
         {
             int x, y, p, q;
             int nwx, nwy;
-            var posNWC = new Coordinate(bounds.MinX, bounds.MaxY);
+            var posNWC = new Coordinate(envelope.MinX, envelope.MaxY);
             _projection.PositionToPoint(posNWC, out nwx, out nwy, _N - 1);
 
             int sex, sey;
-            var posSEC = new Coordinate(bounds.MaxX, bounds.MinY);
+            var posSEC = new Coordinate(envelope.MaxX, envelope.MinY);
             _projection.PositionToPoint(posSEC, out sex, out sey, _N - 1);
 
-            var posSWC = new Coordinate(bounds.MinX, bounds.MinY);
+            var posSWC = new Coordinate(envelope.MinX, envelope.MinY);
             _projection.PositionToPoint(posSWC, out x, out y, _N - 1);
             p = nwy - y + 1;
             q = sex - x + 1;
             return new HilbertEnvelope(x, y, p, q);
         }
 
-        private Envelope HilbertBoxToBoundingBox(int x, int y, int p, int q)
+        private Envelope HilbertEnvelopeToEnvelope(int x, int y, int p, int q)
         {
             Coordinate swc, nec;
             _projection.PointToPosition(out swc, x - 1, y - 1, _N - 1);
             _projection.PointToPosition(out nec, x + q + 2, y + p + 2, _N - 1);
             return new Envelope(swc.X, nec.X, swc.Y, nec.Y);
         }
-
-        // todo: pass to make thread safe
-        //private List<ulong[]> _ranges = null;
 
         private ulong[][] GetRange(char rotation, HilbertEnvelope bounds, int maxRanges)
         {
