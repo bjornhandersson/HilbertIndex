@@ -4,20 +4,11 @@ using System.Linq;
 
 namespace Bson.HilbertIndex
 {
-    public interface IHilbertSearchable
-    {
-        ulong Hid { get; }
-
-        double X { get; }
-
-        double Y { get; }
-    }
-
-    public class HilbertIndex<T> where T : IHilbertSearchable
+    public class HilbertIndex<T> where T : IHilbertIndexable
     {
         // List of items assumed to be sorted according to IHilbertSearchable.Hid
         // Cannot use List<T> due to how binary search is implemented and lack of contravariance in List<T>
-        private readonly List<IHilbertSearchable> _items;
+        private readonly List<IHilbertIndexable> _items;
 
         private readonly HilbertCode _hilbertCode;
 
@@ -25,24 +16,24 @@ namespace Bson.HilbertIndex
         {
             // Important! IHilbertSearchable are assumed to be sorted by poi.Hid
             //  we can easily populate the cache sorted so don't spend expensive time sorting here and lets assume it's sorted.
-            _items = items.Cast<IHilbertSearchable>().ToList();
-            _hilbertCode = HilbertCode.Default();
+            _items = items.Cast<IHilbertIndexable>().ToList();
+            _hilbertCode = new HilbertCode();
         }
 
         public IEnumerable<T> Within(Coordinate coordinate, int meters)
         {
-            var searchEnvelop = CoordinateSystems.Wgs84.Buffer(coordinate, meters);
+            var searchEnvelop = GeoUtils.Wgs84.Buffer(coordinate, meters);
             var ranges = _hilbertCode.GetRanges(searchEnvelop).Ranges;
 
             return ExtractItems(_items, ranges)
-                .Select(item => (Item: item, Distance: CoordinateSystems.Wgs84.Distance(new Coordinate(item.X, item.Y), coordinate)))
+                .Select(item => new { Item = item, Distance = GeoUtils.Wgs84.Distance(new Coordinate(item.X, item.Y), coordinate)})
                 .Where(item => item.Distance <= meters)
                 .OrderBy(item => item.Distance)
                 .Select(item => item.Item)
                 .Cast<T>();
         }
 
-        private static IEnumerable<IHilbertSearchable> ExtractItems(List<IHilbertSearchable> items, IEnumerable<ulong[]> ranges)
+        private static IEnumerable<IHilbertIndexable> ExtractItems(List<IHilbertIndexable> items, IEnumerable<ulong[]> ranges)
         {
             var hidComparer = new HilbertComparer();
             // Since we know that the ranges are sorted we don't have to search the whole list every time 
@@ -52,7 +43,7 @@ namespace Bson.HilbertIndex
             {
                 // Can be optimized by using custom bin search algorithm taking a Func<T, int> to do the comparision
                 // Will also get rid of the stupid casting from IHilbertSearchable -> T and we can work on type T all the way
-                var searchItem = new Searchable(hid: range[0], x: 0, y: 0);
+                var searchItem = new Searchable(hid: range[0]);
 
                 // Find index to start search.
                 int index = items.BinarySearch(startIndex, items.Count - startIndex, searchItem, hidComparer);
@@ -67,22 +58,17 @@ namespace Bson.HilbertIndex
             }
         }
 
-        internal class Searchable : IHilbertSearchable
+        private class Searchable : IHilbertIndexable
         {
-            public Searchable(ulong hid, double x, double y)
-            {
-                Hid = hid;
-                X = x;
-                Y = y;
-            }
+            public Searchable(ulong hid) => Hid = hid;
             public ulong Hid { get; }
-            public double X { get; }
-            public double Y { get; }
+            public double X => 0;
+            public double Y => 0;
         }
 
-        internal class HilbertComparer : IComparer<IHilbertSearchable>
+        private class HilbertComparer : IComparer<IHilbertIndexable>
         {
-            public int Compare(IHilbertSearchable left, IHilbertSearchable right)
+            public int Compare(IHilbertIndexable left, IHilbertIndexable right)
                 => left.Hid.CompareTo(right.Hid);
         }
     }

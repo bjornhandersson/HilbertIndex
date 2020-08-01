@@ -16,10 +16,10 @@ namespace Bson.HilbertIndex.Test
         [Test]
         public void GetRange_Should_Give_Ranges_For_Position()
         {
-            var indexer = HilbertCode.Default();
+            var indexer = new HilbertCode();
 
             // Search target
-            ulong hid = indexer.PositionToIndex(new Coordinate(18, 57));
+            ulong hid = indexer.Encode(new Coordinate(18, 57));
 
             // Envelope arround search bound 
             var searchEnvelope = new Envelope(17.99999, 18.00009, 56.99999, 57.00001);
@@ -37,16 +37,16 @@ namespace Bson.HilbertIndex.Test
         [Test]
         public void Should_Find_Location_In_Real_World_Coord_System()
         {
-            var indexer = HilbertCode.Default();
+            var indexer = new HilbertCode();
 
             var coordToFind = new Coordinate(18, 57);
-            var indexToFind = indexer.PositionToIndex(coordToFind);
+            var indexToFind = indexer.Encode(coordToFind);
 
             // Create a coordinate 1000 meters away from the one we want to find,
-            var searchCoord = CoordinateSystems.Wgs84.Move(coordToFind, meters: 1000, bearing: 0);
+            var searchCoord = GeoUtils.Wgs84.Move(coordToFind, meters: 1000, bearing: 0);
 
             // Create a search envelope (box) extending 1000 meters from the search point (tolerance)
-            var hitEnvelope = CoordinateSystems.Wgs84.Buffer(searchCoord, meters: 1000);
+            var hitEnvelope = GeoUtils.Wgs84.Buffer(searchCoord, meters: 1000);
 
             // Assert the Hilbert index provides ut with the ranges we need to search to find our coordinate when
             // given the envelop including the coorindate of our target.
@@ -54,7 +54,7 @@ namespace Bson.HilbertIndex.Test
             Assert.IsTrue(found);
 
             // Create a search envelope that should not include the coord we're looking for
-            var missEnvelope = CoordinateSystems.Wgs84.Buffer(searchCoord, meters: 900);
+            var missEnvelope = GeoUtils.Wgs84.Buffer(searchCoord, meters: 900);
 
             // Expect a miss
             bool notFound = indexer.GetRanges(missEnvelope).Ranges.Any(range => indexToFind.Between(range));
@@ -87,7 +87,7 @@ namespace Bson.HilbertIndex.Test
 
             //
             // Assert
-            var distance = CoordinateSystems.Wgs84.Distance(new Coordinate(hit.X, hit.Y), search);
+            var distance = GeoUtils.Wgs84.Distance(new Coordinate(hit.X, hit.Y), search);
             Assert.AreEqual(2, hit.Id);
             Assert.IsTrue(distance < toleranceMeters);
         }
@@ -112,10 +112,10 @@ namespace Bson.HilbertIndex.Test
             var toleranceMeters = 100;
 
             var firstItem = testData.First();
-            var firstSearch = CoordinateSystems.Wgs84.Move(new Coordinate(firstItem.X, firstItem.Y), meters: 20, bearing: 0);
+            var firstSearch = GeoUtils.Wgs84.Move(new Coordinate(firstItem.X, firstItem.Y), meters: 20, bearing: 0);
 
             var lastItem = testData.Last();
-            var lastSearch = CoordinateSystems.Wgs84.Move(new Coordinate(lastItem.X, lastItem.Y), meters: 20, bearing: 0);
+            var lastSearch = GeoUtils.Wgs84.Move(new Coordinate(lastItem.X, lastItem.Y), meters: 20, bearing: 0);
 
             //
             // Act
@@ -154,7 +154,7 @@ namespace Bson.HilbertIndex.Test
 
             // Coordinate to search from
             var poiToFind = testData[testData.Count / 2];
-            var search = CoordinateSystems.Wgs84.Move(new Coordinate(poiToFind.X, poiToFind.Y), meters: 20, bearing: 0);
+            var search = GeoUtils.Wgs84.Move(new Coordinate(poiToFind.X, poiToFind.Y), meters: 20, bearing: 0);
 
             // Categories to filter
             var categories = new int[] { 1 };
@@ -173,7 +173,7 @@ namespace Bson.HilbertIndex.Test
 
         private static IEnumerable<Poi> Generate(int number)
         {
-            var hilbertCode = HilbertCode.Default();
+            var hilbertCode = new HilbertCode();
             var random = new Random();
             for (uint i = 0; i < number; i++)
             {

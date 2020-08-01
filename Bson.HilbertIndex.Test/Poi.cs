@@ -6,9 +6,9 @@ using System.Collections.Generic;
 
 namespace Bson.HilbertIndex.Test
 {
-    public class Poi : IHilbertSearchable
+    public class Poi : IHilbertIndexable
     {
-        private static readonly HilbertCode s_hilbertCode = HilbertCode.Default();
+        private static readonly HilbertCode s_hilbertCode = new HilbertCode();
 
         public Poi(uint id, double longitude, double latitude, ulong hid, int categoryId)
         {
@@ -30,6 +30,6 @@ namespace Bson.HilbertIndex.Test
         public int CategoryId { get; }
 
         public static Poi Create(uint id, int categoryId, Coordinate coord)
-            => new Poi(id, coord.X, coord.Y, s_hilbertCode.PositionToIndex(coord), categoryId);
+            => new Poi(id, coord.X, coord.Y, s_hilbertCode.Encode(coord), categoryId);
     }
 }

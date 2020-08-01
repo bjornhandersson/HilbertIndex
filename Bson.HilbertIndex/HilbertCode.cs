@@ -1,259 +1,37 @@
 ﻿using System;
 using System.Linq;
 using System.Collections.Generic;
-using System.Text;
-using System.IO;
-using System.Globalization;
 
 namespace Bson.HilbertIndex
 {
-    public class Coordinate
-    {
-        public Coordinate(double x, double y)
-        {
-            X = x;
-            Y = y;
-        }
-
-        public double X { get; }
-
-        public double Y { get; }
-    }
-
-    public class CoordinateSystems
-    {
-        private static double Min(params double[] values) => values.Min();
-        private static double Max(params double[] values) => values.Max();
-
-        public class Wgs84
-        {
-            private const int EARTH_RADIOUS = 6366710;
-
-            // Crete an envelope buffered around the given coordnate to the given distance in meter in true spheric distance
-            public static Envelope Buffer(Coordinate coordinate, int meters)
-            {
-                // Todo: Do proper Mafs
-                //  does not deal with datum line and can be more efficent without Min/Max functions
-                var n = Move(coordinate, meters, 0);
-                var e = Move(coordinate, meters, 90);
-                var s = Move(coordinate, meters, 180);
-                var w = Move(coordinate, meters, 270);
-                return new Envelope(
-                    Min(n.X, e.X, s.X, w.X),
-                    Max(n.X, e.X, s.X, w.X),
-                    Min(n.Y, e.Y, s.Y, w.Y),
-                    Max(n.Y, e.Y, s.Y, w.Y)
-                );
-            }
-
-            // Distance between two wgs84 coordinates 
-            public static double Distance(Coordinate firs, Coordinate second)
-                => DistanceRadians(firs, second) * EARTH_RADIOUS;
-
-            public static Coordinate Move(Coordinate origin, double meters, double bearing)
-            {
-                // Todo: Improve precision here.
-                // meters as fractions of radious of earth is... tiny consider using decimla type (128 bit vs 64 for a double)
-                meters /= EARTH_RADIOUS;
-
-                double e1 = origin.X * Math.PI / 180.0;
-                double n1 = origin.Y * Math.PI / 180.0;
-
-                bearing *= Math.PI / 180.0;
-
-                double radY = Math.Asin(Math.Sin(n1) * Math.Cos(meters) + Math.Cos(n1) * Math.Sin(meters) * Math.Cos(bearing));
-                double radX = Math.Atan2(Math.Sin(bearing) * Math.Sin(meters) * Math.Cos(n1),
-                    Math.Cos(meters) - Math.Sin(n1) * Math.Sin(radY));
-
-                double x = (e1 + radX) * 180.0 / Math.PI;
-                double y = radY * 180.0 / Math.PI;
-
-                return new Coordinate(x, y);
-            }
-
-            private static double DistanceRadians(Coordinate first, Coordinate second)
-            {
-                double e1 = first.X / 180.0 * Math.PI;
-                double e2 = second.X / 180.0 * Math.PI;
-
-                double n1 = first.Y / 180.0 * Math.PI;
-                double n2 = second.Y / 180.0 * Math.PI;
-
-                double sin_y = Math.Sin((n1 - n2) / 2.0);
-                sin_y *= sin_y;
-
-                double sin_x = Math.Sin((e1 - e2) / 2.0);
-                sin_x *= sin_x;
-
-                return 2.0 * Math.Asin(Math.Sqrt(sin_y + Math.Cos(n1) * Math.Cos(n2) * sin_x));
-            }
-        }
-    }
-
-    public class Envelope
-    {
-        public Envelope(double minX, double maxX, double minY, double maxY)
-        {
-            MinX = minX;
-            MaxX = maxX;
-            MinY = minY;
-            MaxY = maxY;
-        }
-
-        public double MinX { get; }
-        public double MaxX { get; }
-        public double MinY { get; }
-        public double MaxY { get; }
-
-        public Envelope Expand(Coordinate position)
-            => Expand(position.X, position.Y);
-        public Envelope Expand(double x, double y)
-            => new Envelope(
-                x < MinX ? x : MinX,
-                x > MaxX ? x : MaxX,
-                y < MinY ? y : MinY,
-                y > MaxY ? y : MaxY
-            );
-    }
-
-    public class SearchResult
-    {
-        public SearchResult(ulong[][] ranges, IList<Envelope> bounds, IList<HilbertCode.Box> boxes)
-        {
-            Ranges = ranges;
-            Bounds = bounds;
-            Boxes = boxes;
-        }
-        public ulong[][] Ranges { get; }
-
-        public IList<Envelope> Bounds { get; }
-
-        public IList<HilbertCode.Box> Boxes { get; }
-    }
-
-    public class LinearProjection : IProjection
-    {
-        public void PointToPosition(out Coordinate position, int x, int y, int N)
-        {
-            x = Math.Max(Math.Min(x, N), 0);
-            y = Math.Max(Math.Min(y, N), 0);
-            double lon = ((double)x / (N / 360d)) - 180;
-            double lat = ((double)y / (N / 180d)) - 90;
-            position = new Coordinate(lon, lat);
-        }
-
-        public void PositionToPoint(Coordinate position, out int x, out int y, int N)
-        {
-            x = (int)Math.Truncate((180d + position.X) * N / 360d);
-            y = (int)Math.Truncate((90d + position.Y) * N / 180d);
-        }
-    }
-
-    public interface IProjection
-    {
-        /// <summary>
-        /// Convert position to point in grid where lower left corner is (0, 0) and upper right corner is  (N -1, N -1)
-        /// </summary>
-        /// <param name="position">WGS84 position</param>
-        /// <param name="x"></param>
-        /// <param name="y"></param>
-        /// <param name="N"></param>
-        void PositionToPoint(Coordinate position, out int x, out int y, int N);
-
-        /// <summary>
-        /// Convert point in grid where lower left corner is (0, 0) and upper right corner is  (N -1, N -1) to WGS84 position
-        /// </summary>
-        /// <param name="position">WGS84 position</param>
-        /// <param name="x"></param>
-        /// <param name="y"></param>
-        /// <param name="N"></param>
-        void PointToPosition(out Coordinate position, int x, int y, int N);
-    }
-
+    /// <summary>
+    /// Class containing various utility methods for translating 2D coordinates to Hilbert indices
+    /// </summary>
     public class HilbertCode
     {
-        /// <summary>
-        /// Box in 2d space
-        /// </summary>
-        public struct Box
+        public enum Resolution : int
         {
-            private readonly int _x;
-            private readonly int _y;
-            private readonly int _p;
-            private readonly int _q;
+            ULTRALOW = 4,
 
-
-            /// <summary>
-            /// Create a new box in hilbert coordinate system
-            /// </summary>
-            /// <param name="x">Lower left X</param>
-            /// <param name="y">Lower left Y</param>
-            /// <param name="p">Height</param>
-            /// <param name="q">Width</param>
-            public Box(int x, int y, int p, int q)
-            {
-                _x = x;
-                _y = y;
-                _p = Math.Max(1, p);
-                _q = Math.Max(1, q);
-            }
-
-            public int MaxX { get { return _x + _q; } }
-
-            public int MaxY { get { return _y + _p; } }
-
-            public int MinX { get { return _x; } }
-
-            public int MinY { get { return _y; } }
-
-            public int height { get { return _p; } }
-
-            public int width { get { return _q; } }
-
-            public override string ToString()
-                => string.Format("xy:{0},{1} p:{2},q:{3}", _x, _y, _p, _q);
-
-            public override int GetHashCode()
-                => (_x << _y) ^ (_p << _q);
-
-            public override bool Equals(object obj)
-                => obj is Box && obj.GetHashCode() == this.GetHashCode();
-        }
-
-        public struct Resolution
-        {
-            public static int ULTRALOW = 4;
-
-            public static int LOW = 10;
+            LOW = 10,
 
             /// <summary>
             /// Max resolution that still fitts in 32bit int.
             /// 650x650 grid
             /// </summary>
-            public static int MEDIUM = 16;
+            MEDIUM = 16,
 
             /// <summary>
             /// 40bit value
             ///  70 x 70 grid
             /// </summary>
-            public static int HIGH = 19;
+            HIGH = 19,
 
             /// <summary>
             /// Max allowed value (todo, 32 is max but alg does not support that now, overflows)
             /// </summary>
-            public static int ULTRAHIGH = 30;
+            ULTRAHIGH = 30
         }
-
-        public static HilbertCode Create(int resolution, IProjection projection)
-        {
-            return new HilbertCode(resolution, projection);
-        }
-
-        public static HilbertCode Default()
-        {
-            return new HilbertCode(Resolution.HIGH, new LinearProjection());
-        }
-
 
         // e = 16 (fit 32bit uint) => (~611m * 2)
         // e = 19 (fit 32bit uint) => (~79m * 2)
@@ -264,14 +42,14 @@ namespace Bson.HilbertIndex
 
         private const int DefaultRangeCompactation = 128;
 
-        private HilbertCode(int resolution, IProjection projection)
+        public HilbertCode(Resolution resolution = Resolution.HIGH, IProjection projection = null)
         {
-            if (resolution > 30)
+            if ((int)resolution > 30)
             {
                 throw new ArgumentOutOfRangeException(nameof(resolution), "Resolution cannot be above 30");
             }
-            _N = (int)Math.Pow(2, resolution);
-            _projection = projection;
+            _N = (int)Math.Pow(2, (int)resolution);
+            _projection = projection ?? new LinearProjection();
         }
 
         /// <summary>
@@ -303,22 +81,10 @@ namespace Bson.HilbertIndex
         /// </summary>
         /// <param name="position">Position</param>
         /// <returns>number representing the position on a one-dimensional hilbert curve</returns>
-        public ulong PositionToIndex(Coordinate position)
+        public ulong Encode(Coordinate position)
         {
             _projection.PositionToPoint(position, out int x, out int y, _N - 1);
-            return PointToIndex(x, y, _N);
-        }
-
-        /// <summary>
-        /// Get the positin for the given hilbert number.
-        /// </summary>
-        /// <param name="d">hilbert number</param>
-        /// <returns>Position representing the hilbert number</returns>
-        public Coordinate IndexToPosition(ulong d)
-        {
-            IndexToPoint(_N, d, out int x, out int y);
-            _projection.PointToPosition(out var position, x, y, _N - 1);
-            return position;
+            return Encode(x, y, _N);
         }
 
         /// <summary>
@@ -328,9 +94,19 @@ namespace Bson.HilbertIndex
         /// <param name="x">x</param>
         /// <param name="y">y</param>
         /// <returns>number representing the position on a one-dimensional hilbert curve</returns>
-        public ulong PointToIndex(int x, int y)
+        public ulong Encode(int x, int y)
+            => Encode(x, y, _N);
+
+        /// <summary>
+        /// Get the coordinate for the given hilbert indices.
+        /// </summary>
+        /// <param name="d">hilbert number</param>
+        /// <returns>Coordinate representing the hilbert number</returns>
+        public Coordinate Decode(ulong d)
         {
-            return PointToIndex(x, y, _N);
+            DecodeoPoint(_N, d, out int x, out int y);
+            _projection.PointToPosition(out var position, x, y, _N - 1);
+            return position;
         }
 
         /// <summary>
@@ -339,12 +115,9 @@ namespace Bson.HilbertIndex
         /// <param name="d"></param>
         /// <param name="x"></param>
         /// <param name="y"></param>
-        public void IndexToPoint(ulong d, out int x, out int y)
-        {
-            IndexToPoint(_N, d, out x, out y);
-        }
-
-
+        public void Decode(ulong d, out int x, out int y)
+            => DecodeoPoint(_N, d, out x, out y);
+        
         /// <summary>
         /// Get ranges and bounds for nearest neighbour search
         /// </summary>
@@ -383,10 +156,9 @@ namespace Bson.HilbertIndex
         /// <param name="p">height of the box</param>
         /// <param name="q">width of the box</param>
         /// <returns></returns>
-        public SearchResult GetRanges(Box box, int maxRanges = DefaultRangeCompactation)
-        {
-            return GetRange('A', box, maxRanges);
-        }
+        public SearchResult GetRanges(HilbertEnvelope box, int maxRanges = DefaultRangeCompactation)
+            => GetRange('A', box, maxRanges);
+        
 
         /// <summary>
         /// Get the bounding box for the given ranges of hilber indices.
@@ -398,8 +170,8 @@ namespace Bson.HilbertIndex
             Envelope box = null;
             for (int r = 0; r < ranges.Length; r++)
             {
-                Coordinate first = IndexToPosition(ranges[r][0]);
-                Coordinate last = IndexToPosition(ranges[r][1]);
+                Coordinate first = Decode(ranges[r][0]);
+                Coordinate last = Decode(ranges[r][1]);
 
                 if (box == null)
                 {
@@ -414,11 +186,11 @@ namespace Bson.HilbertIndex
             return box;
         }
 
-        private Box CreateBox1D(ulong center, ulong other)
+        private HilbertEnvelope CreateBox1D(ulong center, ulong other)
         {
             int x1, y1, x2, y2;
-            IndexToPoint(center, out x1, out y1);
-            IndexToPoint(other, out x2, out y2);
+            Decode(center, out x1, out y1);
+            Decode(other, out x2, out y2);
 
             // distance between p1 and p2
             int hw = (int)Math.Ceiling(Math.Sqrt(Math.Pow((x1 - x2), 2) + Math.Pow((y1 - y2), 2)));
@@ -428,11 +200,11 @@ namespace Bson.HilbertIndex
             int x = x1 - hw;
             int y = y1 - hw;
 
-            return new Box(x, y, Math.Min((hw * 2) + 1, _N - 1), Math.Min((hw * 2) + 1, _N - 1));
+            return new HilbertEnvelope(x, y, Math.Min((hw * 2) + 1, _N - 1), Math.Min((hw * 2) + 1, _N - 1));
         }
 
         // 2 ^ 16 fits within uint32, higher n needs ulong
-        private static ulong PointToIndex(int x, int y, int n)
+        private static ulong Encode(int x, int y, int n)
         {
             // if x or y > n => overflow exception
             int rx, ry, s = 0;
@@ -447,7 +219,7 @@ namespace Bson.HilbertIndex
             return d;
         }
 
-        private static void IndexToPoint(int n, ulong d, out int x, out int y)
+        private static void DecodeoPoint(int n, ulong d, out int x, out int y)
         {
             int rx, ry, s = 0;
             ulong t = d;
@@ -487,7 +259,7 @@ namespace Bson.HilbertIndex
         /// <param name="y"></param>
         /// <param name="p"></param>
         /// <param name="q"></param>
-        private Box BoundingBoxToHilbertBox(Envelope bounds)
+        private HilbertEnvelope BoundingBoxToHilbertBox(Envelope bounds)
         {
             int x, y, p, q;
             int nwx, nwy;
@@ -502,7 +274,7 @@ namespace Bson.HilbertIndex
             _projection.PositionToPoint(posSWC, out x, out y, _N - 1);
             p = nwy - y + 1;
             q = sex - x + 1;
-            return new Box(x, y, p, q);
+            return new HilbertEnvelope(x, y, p, q);
         }
 
         private Envelope HilbertBoxToBoundingBox(int x, int y, int p, int q)
@@ -516,7 +288,7 @@ namespace Bson.HilbertIndex
         // todo: pass to make thread safe
         //private List<ulong[]> _ranges = null;
 
-        private SearchResult GetRange(char rotation, Box bounds, int maxRanges)
+        private SearchResult GetRange(char rotation, HilbertEnvelope bounds, int maxRanges)
         {
             if ((bounds.MaxX < 0 && bounds.MaxY < 0) || (bounds.MinX > _N - 1 && bounds.MinY > _N - 1))
                 throw new ArgumentException("Bounds outside world");
@@ -525,7 +297,7 @@ namespace Bson.HilbertIndex
             var boxes = WrapOverlap(bounds);
             foreach (var box in boxes)
             {
-                SplitQuad(rotation, (ulong)_N, (ulong)0, (ulong)box.MinX, (ulong)box.MinY, (ulong)box.height, (ulong)box.width, ranges);
+                SplitQuad(rotation, (ulong)_N, (ulong)0, (ulong)box.MinX, (ulong)box.MinY, (ulong)box.Height, (ulong)box.Width, ranges);
             }
 
             ulong[][] output;
@@ -541,12 +313,12 @@ namespace Bson.HilbertIndex
 
             return new SearchResult(
                 output,
-                boxes.ConvertAll<Envelope>(box => HilbertBoxToBoundingBox(box.MinX, box.MinY, box.height, box.width)),
+                boxes.Select(box => HilbertBoxToBoundingBox(box.MinX, box.MinY, box.Height, box.Width)).ToList(),
                 boxes
             );
         }
 
-        // todo: make range truncating native in this method to avoid level of recursion and truncation method penalties
+        // todo: make range compactation native in this method to avoid level of recursion and CompactRanges method penalties
         private void SplitQuad(char rotation, ulong t, ulong mino, ulong x, ulong y, ulong p, ulong q, List<ulong[]> ranges)
         {
             if (t == p && t == q)
@@ -801,60 +573,60 @@ namespace Bson.HilbertIndex
                 throw new ArgumentException("Ranges cannot have a length of 0");
 
             // store the value of next min intervall found in range which is greater than iMinTolerance
-            ulong iMinTolerance = 1;
-            ulong iNextMin = ulong.MaxValue;
-            int iLength = ranges.Length;
-            while (iLength > length)
+            ulong minTolerance = 1;
+            ulong nextMin = ulong.MaxValue;
+            int currentLength = ranges.Length;
+            while (currentLength > length)
             {
-                int iComInx = 0;
-                int iCount = 1;
+                int index = 0;
+                int count = 1;
 
-                for (int i = 1; i < iLength; i++)
+                for (int i = 1; i < currentLength; i++)
                 {
                     // join range if less than tolerance
-                    ulong diff = ranges[i][0] - ranges[iComInx][1];
-                    if (diff <= iMinTolerance)
+                    ulong diff = ranges[i][0] - ranges[index][1];
+                    if (diff <= minTolerance)
                     {
-                        ranges[iCount - 1][1] = ranges[i][1];
+                        ranges[count - 1][1] = ranges[i][1];
                     }
                     else
                     {
-                        if (diff < iNextMin)
-                            iNextMin = diff;
+                        if (diff < nextMin)
+                            nextMin = diff;
 
-                        ranges[iCount++] = ranges[i];
-                        iComInx = i;
+                        ranges[count++] = ranges[i];
+                        index = i;
                     }
                 }
 
-                iMinTolerance = iNextMin;
-                iNextMin = ulong.MaxValue;
-                iLength = iCount;
+                minTolerance = nextMin;
+                nextMin = ulong.MaxValue;
+                currentLength = count;
             }
 
-            Array.Resize<ulong[]>(ref ranges, iLength);
+            Array.Resize<ulong[]>(ref ranges, currentLength);
             return ranges;
         }
 
-        private List<Box> WrapOverlap(Box box)
+        private List<HilbertEnvelope> WrapOverlap(HilbertEnvelope box)
         {
-            var boxes = new List<Box>();
+            var boxes = new List<HilbertEnvelope>();
             boxes.Add(box);
 
             if (!(box.MinX < 0 || box.MinY < 0 || box.MaxX > _N - 1 || box.MaxY > _N - 1))
                 return boxes;
 
-            var tmpboxes = new List<Box>();
-            foreach (Box b in boxes)
+            var tmpboxes = new List<HilbertEnvelope>();
+            foreach (HilbertEnvelope b in boxes)
             {
                 if (b.MinX < 0)
                 {
-                    if (b.width + b.MinX > 0)
+                    if (b.Width + b.MinX > 0)
                     {
-                        tmpboxes.Add(new Box(0, b.MinY, b.height, b.width + b.MinX));
+                        tmpboxes.Add(new HilbertEnvelope(0, b.MinY, b.Height, b.Width + b.MinX));
                     }
 
-                    tmpboxes.Add(new Box((_N - 1) + b.MinX, b.MinY, b.height, b.MinX * -1));
+                    tmpboxes.Add(new HilbertEnvelope((_N - 1) + b.MinX, b.MinY, b.Height, b.MinX * -1));
                 }
                 else
                 {
@@ -866,20 +638,20 @@ namespace Bson.HilbertIndex
             boxes.AddRange(tmpboxes);
             tmpboxes.Clear();
 
-            foreach (Box b in boxes)
+            foreach (HilbertEnvelope b in boxes)
             {
                 if (b.MinY < 0)
                 {
 
-                    if (b.height + b.MinY > 0)
+                    if (b.Height + b.MinY > 0)
                     {
-                        tmpboxes.Add(new Box(b.MinX, 0, b.height + b.MinY, b.width));
+                        tmpboxes.Add(new HilbertEnvelope(b.MinX, 0, b.Height + b.MinY, b.Width));
                     }
                     else
                     {
                         // dont warp from pole to pole.
                         // todo: spread sideways instead
-                        tmpboxes.Add(new Box(b.MinX, (_N - 1) + b.MinY, b.MinY * -1, b.width));
+                        tmpboxes.Add(new HilbertEnvelope(b.MinX, (_N - 1) + b.MinY, b.MinY * -1, b.Width));
                     }
                 }
                 else
@@ -892,12 +664,12 @@ namespace Bson.HilbertIndex
             boxes.AddRange(tmpboxes);
             tmpboxes.Clear();
 
-            foreach (Box b in boxes)
+            foreach (HilbertEnvelope b in boxes)
             {
                 if (b.MaxX > _N - 1)
                 {
-                    tmpboxes.Add(new Box(b.MinX, b.MinY, b.height, (_N - 1) - b.MinX));
-                    tmpboxes.Add(new Box(0, b.MinY, b.height, b.MaxX - (_N - 1)));
+                    tmpboxes.Add(new HilbertEnvelope(b.MinX, b.MinY, b.Height, (_N - 1) - b.MinX));
+                    tmpboxes.Add(new HilbertEnvelope(0, b.MinY, b.Height, b.MaxX - (_N - 1)));
                 }
                 else
                 {
@@ -909,11 +681,11 @@ namespace Bson.HilbertIndex
             boxes.AddRange(tmpboxes);
             tmpboxes.Clear();
 
-            foreach (Box b in boxes)
+            foreach (HilbertEnvelope b in boxes)
             {
                 if (b.MaxY > _N - 1)
                 {
-                    tmpboxes.Add(new Box(b.MinX, b.MinY, (_N - 1) - b.MinY, b.width));
+                    tmpboxes.Add(new HilbertEnvelope(b.MinX, b.MinY, (_N - 1) - b.MinY, b.Width));
                     // dont warp from pole to pole.
                     // todo: spread sideways instead
                     //tmpboxes.Add(new box(b.minX, 0, b.maxY - (N - 1), b.width));
@@ -928,7 +700,7 @@ namespace Bson.HilbertIndex
             boxes.AddRange(tmpboxes);
             tmpboxes.Clear();
 
-            boxes.Sort((box1, box2) => PointToIndex(box1.MinX, box1.MinY, _N).CompareTo(PointToIndex(box2.MinX, box2.MinY, _N)));
+            boxes.Sort((box1, box2) => Encode(box1.MinX, box1.MinY, _N).CompareTo(Encode(box2.MinX, box2.MinY, _N)));
             return boxes;
         }
     }
