@@ -124,7 +124,7 @@ namespace Bson.HilbertIndex
         /// <param name="search1D">Key of search point</param>
         /// <param name="neighbour1D">Nearest one dimensional neighbour</param>
         /// <returns></returns>
-        public SearchResult GetRanges(ulong search1D, ulong neighbour1D, int maxRanges)
+        public SearchResult GetRanges(ulong search1D, ulong neighbour1D, int maxRanges = DefaultRangeCompactation)
         {
             var box = CreateBox1D(search1D, neighbour1D);
             return GetRanges(box, maxRanges);

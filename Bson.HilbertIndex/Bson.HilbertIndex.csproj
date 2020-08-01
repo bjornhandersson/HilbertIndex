@@ -2,7 +2,7 @@
 
   <PropertyGroup>
     <TargetFramework>netstandard1.3</TargetFramework>
-    <Version>1.0.0</Version>
+    <Version>1.0.1</Version>
   </PropertyGroup>
 
   <PropertyGroup>
@@ -10,6 +10,9 @@
     Library containing a simple hilbert based spatial index for NearestNeighbour and Within type of queries over a set of points.
     </PackageDescription>
     <PackageTags>library;spatial;geo;hilbert;C#</PackageTags>
+    <PackageProjectUrl>https://github.com/bjornhandersson/HilbertIndex</PackageProjectUrl>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <Authors>bjornhandersson</Authors>
   </PropertyGroup>
 
   <ItemGroup>

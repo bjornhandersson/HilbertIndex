@@ -93,6 +93,25 @@ namespace Bson.HilbertIndex.Test
         }
 
         [Test]
+        public void Should_Find_Exact_Match()
+        {
+            //
+            // Arange
+
+            // Init search structure (cache/index/whatever)
+
+            var testData = new List<Poi>{
+                Poi.Create(1, 1, new Coordinate(18, 57))
+            }.OrderBy(p => p.Hid);
+
+            var index = new HilbertIndex<Poi>(testData);
+            var searchCoord = new Coordinate(18, 57);
+
+            // Act
+            var hit = index.Within(searchCoord, meters: 100).First();
+        }
+
+        [Test]
         public void Test_Index_Should_Find_Edges()
         {
             //
@@ -127,6 +146,40 @@ namespace Bson.HilbertIndex.Test
         }
 
         [Test]
+        public void Index_can_Find_Nearest_Neighbour()
+        {
+            var testData = new List<Poi>{
+                Poi.Create(1, 1, new Coordinate(18, 57)),
+                Poi.Create(2, 1, new Coordinate(18.2, 57)),
+                Poi.Create(3, 1, new Coordinate(18.5, 57)),
+            }.OrderBy(p => p.Hid).ToList();
+
+            var index = new HilbertIndex<Poi>(testData);
+
+            var neareast = index.NearestNeighbours(new Coordinate(18.0001, 57.0001)).First();
+            Assert.AreEqual(1, neareast.Id);
+
+            neareast = index.NearestNeighbours(new Coordinate(18.2001, 57.0001)).First();
+            Assert.AreEqual(2, neareast.Id);
+
+            neareast = index.NearestNeighbours(new Coordinate(18.5001, 57.0001)).First();
+            Assert.AreEqual(3, neareast.Id);
+
+            // Test exact at edges
+            neareast = index.NearestNeighbours(new Coordinate(18, 57)).First();
+            Assert.AreEqual(1, neareast.Id);
+
+            neareast = index.NearestNeighbours(new Coordinate(18.5, 57)).First();
+            Assert.AreEqual(3, neareast.Id);
+
+            var far_a_way = new Coordinate(-74, 41);
+
+            // Coord in New Yourk should be closest to the most western
+            neareast = index.NearestNeighbours(new Coordinate(-74, 41)).First();
+            Assert.AreEqual(1, neareast.Id);
+        }
+
+        [Test]
         public void Index_Should_Performe_On_Large_Collections()
         {
             var random = new Random();
@@ -151,14 +204,9 @@ namespace Bson.HilbertIndex.Test
             // Tolerance in meters
             var toleranceMeters = 100;
 
-
             // Coordinate to search from
             var poiToFind = testData[testData.Count / 2];
             var search = GeoUtils.Wgs84.Move(new Coordinate(poiToFind.X, poiToFind.Y), meters: 20, bearing: 0);
-
-            // Categories to filter
-            var categories = new int[] { 1 };
-
 
             // Should clock in on about 100 000 searches per second on single thread over 1M pois.
             stopWatch.Reset();

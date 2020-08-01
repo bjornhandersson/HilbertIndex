@@ -12,6 +12,8 @@ namespace Bson.HilbertIndex
 
         private readonly HilbertCode _hilbertCode;
 
+        private static readonly HilbertComparer s_hilbertComparer = new HilbertComparer();
+
         public HilbertIndex(IEnumerable<T> items)
         {
             // Important! IHilbertSearchable are assumed to be sorted by poi.Hid
@@ -26,8 +28,39 @@ namespace Bson.HilbertIndex
             var ranges = _hilbertCode.GetRanges(searchEnvelop).Ranges;
 
             return ExtractItems(_items, ranges)
-                .Select(item => new { Item = item, Distance = GeoUtils.Wgs84.Distance(new Coordinate(item.X, item.Y), coordinate)})
+                .Select(item => new { Item = item, Distance = GeoUtils.Wgs84.Distance(new Coordinate(item.X, item.Y), coordinate) })
                 .Where(item => item.Distance <= meters)
+                .OrderBy(item => item.Distance)
+                .Select(item => item.Item)
+                .Cast<T>();
+        }
+
+        public IEnumerable<T> NearestNeighbours(Coordinate coordinate)
+        {
+            ulong search1D = _hilbertCode.Encode(coordinate);
+            int index = _items.BinarySearch(new Searchable(search1D), s_hilbertComparer);
+            
+            ulong neighbour1D = 0;
+
+            if(index > -1)
+            {
+                neighbour1D = _items[index].Hid;
+            }
+            // Matched last
+            else if (~index == _items.Count - 1)
+            {
+                neighbour1D = _items[~index].Hid;
+            }
+            else 
+            {
+                ulong min = _items[~index].Hid;
+                ulong max = _items[~index + 1].Hid;
+                neighbour1D = search1D - max < min - search1D ? max : min;
+            }
+
+            var ranges = _hilbertCode.GetRanges(search1D, neighbour1D).Ranges;
+            return ExtractItems(_items, ranges)
+                .Select(item => new { Item = item, Distance = GeoUtils.Wgs84.Distance(new Coordinate(item.X, item.Y), coordinate) })
                 .OrderBy(item => item.Distance)
                 .Select(item => item.Item)
                 .Cast<T>();
@@ -35,7 +68,6 @@ namespace Bson.HilbertIndex
 
         private static IEnumerable<IHilbertIndexable> ExtractItems(List<IHilbertIndexable> items, IEnumerable<ulong[]> ranges)
         {
-            var hidComparer = new HilbertComparer();
             // Since we know that the ranges are sorted we don't have to search the whole list every time 
             //  -> continue from end of preious segment stored in startIndex
             int startIndex = 0;
@@ -46,7 +78,7 @@ namespace Bson.HilbertIndex
                 var searchItem = new Searchable(hid: range[0]);
 
                 // Find index to start search.
-                int index = items.BinarySearch(startIndex, items.Count - startIndex, searchItem, hidComparer);
+                int index = items.BinarySearch(startIndex, items.Count - startIndex, searchItem, s_hilbertComparer);
                 index = index < 0 ? ~index : index;
 
                 // Take items while Hilbert number is less than the range end
