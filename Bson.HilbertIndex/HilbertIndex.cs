@@ -25,7 +25,7 @@ namespace Bson.HilbertIndex
         public IEnumerable<T> Within(Coordinate coordinate, int meters)
         {
             var searchEnvelop = GeoUtils.Wgs84.Buffer(coordinate, meters);
-            var ranges = _hilbertCode.GetRanges(searchEnvelop).Ranges;
+            var ranges = _hilbertCode.GetRanges(searchEnvelop);
 
             return ExtractItems(_items, ranges)
                 .Select(item => new { Item = item, Distance = GeoUtils.Wgs84.Distance(new Coordinate(item.X, item.Y), coordinate) })
@@ -58,7 +58,7 @@ namespace Bson.HilbertIndex
                 neighbour1D = search1D - max < min - search1D ? max : min;
             }
 
-            var ranges = _hilbertCode.GetRanges(search1D, neighbour1D).Ranges;
+            var ranges = _hilbertCode.GetRanges(search1D, neighbour1D);
             return ExtractItems(_items, ranges)
                 .Select(item => new { Item = item, Distance = GeoUtils.Wgs84.Distance(new Coordinate(item.X, item.Y), coordinate) })
                 .OrderBy(item => item.Distance)

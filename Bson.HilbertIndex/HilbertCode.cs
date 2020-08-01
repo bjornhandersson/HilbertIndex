@@ -88,7 +88,7 @@ namespace Bson.HilbertIndex
         }
 
         /// <summary>
-        /// returns the hilbert number for the point int the hilbert coordinate systems.
+        /// returns the hilbert number for the point in the hilbert coordinate systems.
         /// Coordinate system has 0.0 in lower left corner and ends with 2 ^ CurveOrder - 1 in upper left corner.
         /// </summary>
         /// <param name="x">x</param>
@@ -124,7 +124,7 @@ namespace Bson.HilbertIndex
         /// <param name="search1D">Key of search point</param>
         /// <param name="neighbour1D">Nearest one dimensional neighbour</param>
         /// <returns></returns>
-        public SearchResult GetRanges(ulong search1D, ulong neighbour1D, int maxRanges = DefaultRangeCompactation)
+        public ulong[][] GetRanges(ulong search1D, ulong neighbour1D, int maxRanges = DefaultRangeCompactation)
         {
             var box = CreateBox1D(search1D, neighbour1D);
             return GetRanges(box, maxRanges);
@@ -142,7 +142,7 @@ namespace Bson.HilbertIndex
         /// The smaller number, the larger will the bounding box be. 128 is a good number to keep good precision.
         /// </param>
         /// <returns>ranges of hilbert indices covering the bounding box.</returns>
-        public SearchResult GetRanges(Envelope bounds, int maxRanges = DefaultRangeCompactation)
+        public ulong[][] GetRanges(Envelope bounds, int maxRanges = DefaultRangeCompactation)
         {
             var box = BoundingBoxToHilbertBox(bounds);
             return GetRanges(box, maxRanges);
@@ -156,7 +156,7 @@ namespace Bson.HilbertIndex
         /// <param name="p">height of the box</param>
         /// <param name="q">width of the box</param>
         /// <returns></returns>
-        public SearchResult GetRanges(HilbertEnvelope box, int maxRanges = DefaultRangeCompactation)
+        public ulong[][] GetRanges(HilbertEnvelope box, int maxRanges = DefaultRangeCompactation)
             => GetRange('A', box, maxRanges);
         
 
@@ -288,7 +288,7 @@ namespace Bson.HilbertIndex
         // todo: pass to make thread safe
         //private List<ulong[]> _ranges = null;
 
-        private SearchResult GetRange(char rotation, HilbertEnvelope bounds, int maxRanges)
+        private ulong[][] GetRange(char rotation, HilbertEnvelope bounds, int maxRanges)
         {
             if ((bounds.MaxX < 0 && bounds.MaxY < 0) || (bounds.MinX > _N - 1 && bounds.MinY > _N - 1))
                 throw new ArgumentException("Bounds outside world");
@@ -300,22 +300,14 @@ namespace Bson.HilbertIndex
                 SplitQuad(rotation, (ulong)_N, (ulong)0, (ulong)box.MinX, (ulong)box.MinY, (ulong)box.Height, (ulong)box.Width, ranges);
             }
 
-            ulong[][] output;
-
             if (maxRanges > 0)
             {
-                output = CompactRanges(ranges.ToArray(), maxRanges);
+                return CompactRanges(ranges.ToArray(), maxRanges);
             }
             else
             {
-                output = ranges.ToArray();
+                return ranges.ToArray();
             }
-
-            return new SearchResult(
-                output,
-                boxes.Select(box => HilbertBoxToBoundingBox(box.MinX, box.MinY, box.Height, box.Width)).ToList(),
-                boxes
-            );
         }
 
         // todo: make range compactation native in this method to avoid level of recursion and CompactRanges method penalties

@@ -28,7 +28,7 @@ namespace Bson.HilbertIndex.Test
             var ranges = indexer.GetRanges(searchEnvelope);
 
             // Find if the search target is within the ranges of our search target
-            bool found = ranges.Ranges.Any(range => hid >= range[0] && hid <= range[1]);
+            bool found = ranges.Any(range => hid >= range[0] && hid <= range[1]);
 
             // Should be
             Assert.IsTrue(found);
@@ -50,14 +50,14 @@ namespace Bson.HilbertIndex.Test
 
             // Assert the Hilbert index provides ut with the ranges we need to search to find our coordinate when
             // given the envelop including the coorindate of our target.
-            bool found = indexer.GetRanges(hitEnvelope).Ranges.Any(range => indexToFind.Between(range));
+            bool found = indexer.GetRanges(hitEnvelope).Any(range => indexToFind.Between(range));
             Assert.IsTrue(found);
 
             // Create a search envelope that should not include the coord we're looking for
             var missEnvelope = GeoUtils.Wgs84.Buffer(searchCoord, meters: 900);
 
             // Expect a miss
-            bool notFound = indexer.GetRanges(missEnvelope).Ranges.Any(range => indexToFind.Between(range));
+            bool notFound = indexer.GetRanges(missEnvelope).Any(range => indexToFind.Between(range));
             Assert.IsFalse(notFound);
         }
 
@@ -194,7 +194,7 @@ namespace Bson.HilbertIndex.Test
             var testData = Generate(1000000)
                 .OrderBy(p => p.Hid)
                 .ToList();
-            TestContext.WriteLine(testData.Count);
+
             stopWatch.Start();
             var index = new HilbertIndex<Poi>(testData);
             stopWatch.Stop();
