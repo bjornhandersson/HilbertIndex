@@ -10,7 +10,7 @@ namespace Bson.HilbertIndex.Test
     {
         private static readonly HilbertCode s_hilbertCode = HilbertCode.Default();
 
-        public Poi(ulong id, double longitude, double latitude, ulong hid, int categoryId)
+        public Poi(uint id, double longitude, double latitude, ulong hid, int categoryId)
         {
             Id = id;
             X = longitude;
@@ -19,7 +19,7 @@ namespace Bson.HilbertIndex.Test
             CategoryId = categoryId;
         }
 
-        public ulong Id { get; }
+        public uint Id { get; }
 
         public double X { get; }
 
@@ -29,7 +29,7 @@ namespace Bson.HilbertIndex.Test
 
         public int CategoryId { get; }
 
-        public static Poi Create(ulong id, int categoryId, Coordinate coord)
+        public static Poi Create(uint id, int categoryId, Coordinate coord)
             => new Poi(id, coord.X, coord.Y, s_hilbertCode.PositionToIndex(coord), categoryId);
     }
 }

@@ -135,15 +135,18 @@ namespace Bson.HilbertIndex.Test
             //
             // Arange
 
+            TestContext.WriteLine("Memory before: " + System.Diagnostics.Process.GetCurrentProcess().WorkingSet64);
+
             // Generate 1 Million Pois
             var testData = Generate(1000000)
                 .OrderBy(p => p.Hid)
                 .ToList();
-
+            TestContext.WriteLine(testData.Count);
             stopWatch.Start();
             var index = new HilbertIndex<Poi>(testData);
             stopWatch.Stop();
             TestContext.WriteLine("Init in: " + stopWatch.ElapsedMilliseconds);
+            TestContext.WriteLine("Memory used: " + System.Diagnostics.Process.GetCurrentProcess().WorkingSet64);
 
             // Tolerance in meters
             var toleranceMeters = 100;
@@ -172,11 +175,11 @@ namespace Bson.HilbertIndex.Test
         {
             var hilbertCode = HilbertCode.Default();
             var random = new Random();
-            for (int i = 0; i < number; i++)
+            for (uint i = 0; i < number; i++)
             {
                 double x = (random.NextDouble() * 360) - 180;
                 double y = (random.NextDouble() * 180) - 90;
-                yield return Poi.Create((ulong)i, 1, new Coordinate(x, y));
+                yield return Poi.Create(i, 1, new Coordinate(x, y));
             }
         }
     }

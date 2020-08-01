@@ -16,7 +16,7 @@ namespace Bson.HilbertIndex
         }
 
         public double X { get; }
-        
+
         public double Y { get; }
     }
 
@@ -92,11 +92,6 @@ namespace Bson.HilbertIndex
 
     public class Envelope
     {
-        public Envelope(Coordinate position)
-            : this(position.X, position.X, position.Y, position.Y)
-        {
-        }
-
         public Envelope(double minX, double maxX, double minY, double maxY)
         {
             MinX = minX;
@@ -112,20 +107,18 @@ namespace Bson.HilbertIndex
 
         public Envelope Expand(Coordinate position)
             => Expand(position.X, position.Y);
-        public Envelope Expand(double dblX, double dblY)
-        {
-            return new Envelope(
-                dblX < MinX ? dblX : MinX,
-                dblX > MaxX ? dblX : MaxX,
-                dblY < MinY ? dblY : MinY,
-                dblY > MaxY ? dblY : MaxY
+        public Envelope Expand(double x, double y)
+            => new Envelope(
+                x < MinX ? x : MinX,
+                x > MaxX ? x : MaxX,
+                y < MinY ? y : MinY,
+                y > MaxY ? y : MaxY
             );
-        }
     }
 
-    public class QueryResult
+    public class SearchResult
     {
-        public QueryResult(ulong[][] ranges, List<Envelope> bounds, List<HilbertCode.Box> boxes)
+        public SearchResult(ulong[][] ranges, IList<Envelope> bounds, IList<HilbertCode.Box> boxes)
         {
             Ranges = ranges;
             Bounds = bounds;
@@ -133,9 +126,9 @@ namespace Bson.HilbertIndex
         }
         public ulong[][] Ranges { get; }
 
-        public List<Envelope> Bounds { get; }
+        public IList<Envelope> Bounds { get; }
 
-        public List<HilbertCode.Box> Boxes { get; }
+        public IList<HilbertCode.Box> Boxes { get; }
     }
 
     public class LinearProjection : IProjection
@@ -184,7 +177,11 @@ namespace Bson.HilbertIndex
         /// </summary>
         public struct Box
         {
-            private int x, y, p, q;
+            private readonly int _x;
+            private readonly int _y;
+            private readonly int _p;
+            private readonly int _q;
+
 
             /// <summary>
             /// Create a new box in hilbert coordinate system
@@ -195,24 +192,30 @@ namespace Bson.HilbertIndex
             /// <param name="q">Width</param>
             public Box(int x, int y, int p, int q)
             {
-                this.x = x; this.y = y;
-                this.p = Math.Max(1, p); this.q = Math.Max(1, q);
+                _x = x;
+                _y = y;
+                _p = Math.Max(1, p);
+                _q = Math.Max(1, q);
             }
 
-            public int MaxX { get { return x + q; } }
-            public int MaxY { get { return y + p; } }
-            public int MinX { get { return x; } }
-            public int MinY { get { return y; } }
+            public int MaxX { get { return _x + _q; } }
 
-            public int height { get { return p; } }
-            public int width { get { return q; } }
+            public int MaxY { get { return _y + _p; } }
+
+            public int MinX { get { return _x; } }
+
+            public int MinY { get { return _y; } }
+
+            public int height { get { return _p; } }
+
+            public int width { get { return _q; } }
 
             public override string ToString()
-                =>string.Format("xy:{0},{1} p:{2},q:{3}", x, y, p, q);
-            
+                => string.Format("xy:{0},{1} p:{2},q:{3}", _x, _y, _p, _q);
+
             public override int GetHashCode()
-                => (x << y) ^ (p << q);
-            
+                => (_x << _y) ^ (_p << _q);
+
             public override bool Equals(object obj)
                 => obj is Box && obj.GetHashCode() == this.GetHashCode();
         }
@@ -241,9 +244,9 @@ namespace Bson.HilbertIndex
             public static int ULTRAHIGH = 30;
         }
 
-        public static HilbertCode Create(int resolution, IProjection proj)
+        public static HilbertCode Create(int resolution, IProjection projection)
         {
-            return new HilbertCode(resolution, proj);
+            return new HilbertCode(resolution, projection);
         }
 
         public static HilbertCode Default()
@@ -255,19 +258,20 @@ namespace Bson.HilbertIndex
         // e = 16 (fit 32bit uint) => (~611m * 2)
         // e = 19 (fit 32bit uint) => (~79m * 2)
         // e = 22 (fit 32bit uint) => (~10m * 2)
-        private readonly int N;
+        private readonly int _N;
+
         private readonly IProjection _projection;
 
         private const int DefaultRangeCompactation = 128;
 
-        private HilbertCode(int Resolution, IProjection projection)
+        private HilbertCode(int resolution, IProjection projection)
         {
-            if (Resolution > 30)
+            if (resolution > 30)
             {
-                throw new ArgumentOutOfRangeException("Resolution", "Resolution cannot be above 30");
+                throw new ArgumentOutOfRangeException(nameof(resolution), "Resolution cannot be above 30");
             }
-            this.N = (int)Math.Pow(2, Resolution);
-            this._projection = projection;
+            _N = (int)Math.Pow(2, resolution);
+            _projection = projection;
         }
 
         /// <summary>
@@ -275,7 +279,7 @@ namespace Bson.HilbertIndex
         /// </summary>
         public int CurveOrder
         {
-            get { return (int)(Math.Log(N) / Math.Log(2)); }
+            get { return (int)(Math.Log(_N) / Math.Log(2)); }
         }
 
         /// <summary>
@@ -283,7 +287,7 @@ namespace Bson.HilbertIndex
         /// </summary>
         public int GridSize
         {
-            get { return N - 1; }
+            get { return _N - 1; }
         }
 
         /// <summary>
@@ -301,8 +305,8 @@ namespace Bson.HilbertIndex
         /// <returns>number representing the position on a one-dimensional hilbert curve</returns>
         public ulong PositionToIndex(Coordinate position)
         {
-            _projection.PositionToPoint(position, out int x, out int y, N - 1);
-            return PointToIndex(x, y, N);
+            _projection.PositionToPoint(position, out int x, out int y, _N - 1);
+            return PointToIndex(x, y, _N);
         }
 
         /// <summary>
@@ -312,9 +316,8 @@ namespace Bson.HilbertIndex
         /// <returns>Position representing the hilbert number</returns>
         public Coordinate IndexToPosition(ulong d)
         {
-            IndexToPoint(N, d, out int x, out int y);
-            Coordinate position;
-            _projection.PointToPosition(out position, x, y, N - 1);
+            IndexToPoint(_N, d, out int x, out int y);
+            _projection.PointToPosition(out var position, x, y, _N - 1);
             return position;
         }
 
@@ -327,7 +330,7 @@ namespace Bson.HilbertIndex
         /// <returns>number representing the position on a one-dimensional hilbert curve</returns>
         public ulong PointToIndex(int x, int y)
         {
-            return PointToIndex(x, y, N);
+            return PointToIndex(x, y, _N);
         }
 
         /// <summary>
@@ -338,7 +341,7 @@ namespace Bson.HilbertIndex
         /// <param name="y"></param>
         public void IndexToPoint(ulong d, out int x, out int y)
         {
-            IndexToPoint(N, d, out x, out y);
+            IndexToPoint(_N, d, out x, out y);
         }
 
 
@@ -348,7 +351,7 @@ namespace Bson.HilbertIndex
         /// <param name="search1D">Key of search point</param>
         /// <param name="neighbour1D">Nearest one dimensional neighbour</param>
         /// <returns></returns>
-        public QueryResult GetRanges(ulong search1D, ulong neighbour1D, int maxRanges)
+        public SearchResult GetRanges(ulong search1D, ulong neighbour1D, int maxRanges)
         {
             var box = CreateBox1D(search1D, neighbour1D);
             return GetRanges(box, maxRanges);
@@ -366,7 +369,7 @@ namespace Bson.HilbertIndex
         /// The smaller number, the larger will the bounding box be. 128 is a good number to keep good precision.
         /// </param>
         /// <returns>ranges of hilbert indices covering the bounding box.</returns>
-        public QueryResult GetRanges(Envelope bounds, int maxRanges = DefaultRangeCompactation)
+        public SearchResult GetRanges(Envelope bounds, int maxRanges = DefaultRangeCompactation)
         {
             var box = BoundingBoxToHilbertBox(bounds);
             return GetRanges(box, maxRanges);
@@ -380,7 +383,7 @@ namespace Bson.HilbertIndex
         /// <param name="p">height of the box</param>
         /// <param name="q">width of the box</param>
         /// <returns></returns>
-        public QueryResult GetRanges(Box box, int maxRanges = DefaultRangeCompactation)
+        public SearchResult GetRanges(Box box, int maxRanges = DefaultRangeCompactation)
         {
             return GetRange('A', box, maxRanges);
         }
@@ -400,7 +403,8 @@ namespace Bson.HilbertIndex
 
                 if (box == null)
                 {
-                    box = new Envelope(first).Expand(last);
+                    box = new Envelope(minX: first.X, maxX: first.X, minY: first.Y, maxY: first.Y)
+                        .Expand(last);
                 }
                 else
                 {
@@ -420,11 +424,11 @@ namespace Bson.HilbertIndex
             int hw = (int)Math.Ceiling(Math.Sqrt(Math.Pow((x1 - x2), 2) + Math.Pow((y1 - y2), 2)));
             //int _hw = Math.Max((y1 > y2 ? y1 - y2 : y2 - y1), (x1 > x2 ? x1 - x2 : x2 - x1));
 
-            hw = Math.Min(hw, (N - 1)); // min height of 1 max width world size
+            hw = Math.Min(hw, (_N - 1)); // min height of 1 max width world size
             int x = x1 - hw;
             int y = y1 - hw;
 
-            return new Box(x, y, Math.Min((hw * 2) + 1, N - 1), Math.Min((hw * 2) + 1, N - 1));
+            return new Box(x, y, Math.Min((hw * 2) + 1, _N - 1), Math.Min((hw * 2) + 1, _N - 1));
         }
 
         // 2 ^ 16 fits within uint32, higher n needs ulong
@@ -488,14 +492,14 @@ namespace Bson.HilbertIndex
             int x, y, p, q;
             int nwx, nwy;
             var posNWC = new Coordinate(bounds.MinX, bounds.MaxY);
-            _projection.PositionToPoint(posNWC, out nwx, out nwy, N - 1);
+            _projection.PositionToPoint(posNWC, out nwx, out nwy, _N - 1);
 
             int sex, sey;
             var posSEC = new Coordinate(bounds.MaxX, bounds.MinY);
-            _projection.PositionToPoint(posSEC, out sex, out sey, N - 1);
+            _projection.PositionToPoint(posSEC, out sex, out sey, _N - 1);
 
             var posSWC = new Coordinate(bounds.MinX, bounds.MinY);
-            _projection.PositionToPoint(posSWC, out x, out y, N - 1);
+            _projection.PositionToPoint(posSWC, out x, out y, _N - 1);
             p = nwy - y + 1;
             q = sex - x + 1;
             return new Box(x, y, p, q);
@@ -504,39 +508,38 @@ namespace Bson.HilbertIndex
         private Envelope HilbertBoxToBoundingBox(int x, int y, int p, int q)
         {
             Coordinate swc, nec;
-            _projection.PointToPosition(out swc, x - 1, y - 1, N - 1);
-            _projection.PointToPosition(out nec, x + q + 2, y + p + 2, N - 1);
+            _projection.PointToPosition(out swc, x - 1, y - 1, _N - 1);
+            _projection.PointToPosition(out nec, x + q + 2, y + p + 2, _N - 1);
             return new Envelope(swc.X, nec.X, swc.Y, nec.Y);
         }
 
         // todo: pass to make thread safe
-        private List<ulong[]> _ranges = null;
+        //private List<ulong[]> _ranges = null;
 
-        private QueryResult GetRange(char rotation, Box bounds, int maxRanges)
+        private SearchResult GetRange(char rotation, Box bounds, int maxRanges)
         {
-            if ((bounds.MaxX < 0 && bounds.MaxY < 0) || (bounds.MinX > N - 1 && bounds.MinY > N - 1))
+            if ((bounds.MaxX < 0 && bounds.MaxY < 0) || (bounds.MinX > _N - 1 && bounds.MinY > _N - 1))
                 throw new ArgumentException("Bounds outside world");
 
-            _ranges = null;
-
+            var ranges = new List<ulong[]>();
             var boxes = WrapOverlap(bounds);
             foreach (var box in boxes)
             {
-                SplitQuad(rotation, (ulong)N, (ulong)0, (ulong)box.MinX, (ulong)box.MinY, (ulong)box.height, (ulong)box.width);
+                SplitQuad(rotation, (ulong)_N, (ulong)0, (ulong)box.MinX, (ulong)box.MinY, (ulong)box.height, (ulong)box.width, ranges);
             }
 
-            ulong[][] output = null;
+            ulong[][] output;
 
             if (maxRanges > 0)
             {
-                output = CompactRanges(_ranges.ToArray(), maxRanges);
+                output = CompactRanges(ranges.ToArray(), maxRanges);
             }
             else
             {
-                output = _ranges.ToArray();
+                output = ranges.ToArray();
             }
 
-            return new QueryResult(
+            return new SearchResult(
                 output,
                 boxes.ConvertAll<Envelope>(box => HilbertBoxToBoundingBox(box.MinX, box.MinY, box.height, box.width)),
                 boxes
@@ -544,33 +547,33 @@ namespace Bson.HilbertIndex
         }
 
         // todo: make range truncating native in this method to avoid level of recursion and truncation method penalties
-        private void SplitQuad(char rotation, ulong t, ulong mino, ulong x, ulong y, ulong p, ulong q)
+        private void SplitQuad(char rotation, ulong t, ulong mino, ulong x, ulong y, ulong p, ulong q, List<ulong[]> ranges)
         {
             if (t == p && t == q)
             {
-                AddRange(mino, mino + t * t - 1L);
+                AddRange(mino, mino + t * t - 1L, ranges);
             }
             else if (t > 1)
             {
                 switch (rotation)
                 {
                     case 'A':
-                        SplitQuadA(t, mino, x, y, p, q);
+                        SplitQuadA(t, mino, x, y, p, q, ranges);
                         break;
                     case 'B':
-                        SplitQuadB(t, mino, x, y, p, q);
+                        SplitQuadB(t, mino, x, y, p, q, ranges);
                         break;
                     case 'C':
-                        SplitQuadC(t, mino, x, y, p, q);
+                        SplitQuadC(t, mino, x, y, p, q, ranges);
                         break;
                     case 'D':
-                        SplitQuadD(t, mino, x, y, p, q);
+                        SplitQuadD(t, mino, x, y, p, q, ranges);
                         break;
                 }
             }
         }
 
-        private void SplitQuadA(ulong t, ulong mino, ulong x, ulong y, ulong p, ulong q)
+        private void SplitQuadA(ulong t, ulong mino, ulong x, ulong y, ulong p, ulong q, List<ulong[]> ranges)
         {
             ulong N2 = t / 2L;
             ulong N4 = N2 * N2;
@@ -578,43 +581,43 @@ namespace Bson.HilbertIndex
             switch (type)
             {
                 case 0:
-                    SplitQuad('B', N2, mino, x, y, N2 - y, N2 - x);
-                    SplitQuad('A', N2, mino + N4, x, 0L, y + p - N2, N2 - x);
-                    SplitQuad('A', N2, mino + N4 * 2L, 0L, 0L, y + p - N2, x + q - N2);
-                    SplitQuad('D', N2, mino + N4 * 3L, 0L, y, N2 - y, x + q - N2);
+                    SplitQuad('B', N2, mino, x, y, N2 - y, N2 - x, ranges);
+                    SplitQuad('A', N2, mino + N4, x, 0L, y + p - N2, N2 - x, ranges);
+                    SplitQuad('A', N2, mino + N4 * 2L, 0L, 0L, y + p - N2, x + q - N2, ranges);
+                    SplitQuad('D', N2, mino + N4 * 3L, 0L, y, N2 - y, x + q - N2, ranges);
                     break;
                 case 1:
-                    SplitQuad('A', N2, mino + N4, x, y - N2, p, N2 - x);
-                    SplitQuad('A', N2, mino + N4 * 2L, 0L, y - N2, p, x + q - N2);
+                    SplitQuad('A', N2, mino + N4, x, y - N2, p, N2 - x, ranges);
+                    SplitQuad('A', N2, mino + N4 * 2L, 0L, y - N2, p, x + q - N2, ranges);
                     break;
                 case 2:
-                    SplitQuad('B', N2, mino, x, y, p, N2 - x);
-                    SplitQuad('D', N2, mino + N4 * 3L, 0L, y, p, x + q - N2);
+                    SplitQuad('B', N2, mino, x, y, p, N2 - x, ranges);
+                    SplitQuad('D', N2, mino + N4 * 3L, 0L, y, p, x + q - N2, ranges);
                     break;
                 case 3:
-                    SplitQuad('B', N2, mino, x, y, N2 - y, q);
-                    SplitQuad('A', N2, mino + N4, x, 0L, y + p - N2, q);
+                    SplitQuad('B', N2, mino, x, y, N2 - y, q, ranges);
+                    SplitQuad('A', N2, mino + N4, x, 0L, y + p - N2, q, ranges);
                     break;
                 case 4:
-                    SplitQuad('A', N2, mino + N4 * 2L, x - N2, 0L, y + p - N2, q);
-                    SplitQuad('D', N2, mino + N4 * 3L, x - N2, y, N2 - y, q);
+                    SplitQuad('A', N2, mino + N4 * 2L, x - N2, 0L, y + p - N2, q, ranges);
+                    SplitQuad('D', N2, mino + N4 * 3L, x - N2, y, N2 - y, q, ranges);
                     break;
                 case 5:
-                    SplitQuad('A', N2, mino + N4, x, y - N2, p, q);
+                    SplitQuad('A', N2, mino + N4, x, y - N2, p, q, ranges);
                     break;
                 case 6:
-                    SplitQuad('A', N2, mino + N4 * 2L, x - N2, y - N2, p, q);
+                    SplitQuad('A', N2, mino + N4 * 2L, x - N2, y - N2, p, q, ranges);
                     break;
                 case 7:
-                    SplitQuad('B', N2, mino, x, y, p, q);
+                    SplitQuad('B', N2, mino, x, y, p, q, ranges);
                     break;
                 case 8:
-                    SplitQuad('D', N2, mino + N4 * 3L, x - N2, y, p, q);
+                    SplitQuad('D', N2, mino + N4 * 3L, x - N2, y, p, q, ranges);
                     break;
             }
         }
 
-        private void SplitQuadB(ulong t, ulong mino, ulong x, ulong y, ulong p, ulong q)
+        private void SplitQuadB(ulong t, ulong mino, ulong x, ulong y, ulong p, ulong q, List<ulong[]> ranges)
         {
             ulong N2 = t / 2L;
             ulong N4 = N2 * N2;
@@ -622,43 +625,43 @@ namespace Bson.HilbertIndex
             switch (type)
             {
                 case 0:
-                    SplitQuad('A', N2, mino, x, y, N2 - y, N2 - x);
-                    SplitQuad('B', N2, mino + N4, 0L, y, N2 - y, x + q - N2);
-                    SplitQuad('B', N2, mino + N4 * 2L, 0L, 0L, y + p - N2, x + q - N2);
-                    SplitQuad('C', N2, mino + N4 * 3L, x, 0L, y + p - N2, N2 - x);
+                    SplitQuad('A', N2, mino, x, y, N2 - y, N2 - x, ranges);
+                    SplitQuad('B', N2, mino + N4, 0L, y, N2 - y, x + q - N2, ranges);
+                    SplitQuad('B', N2, mino + N4 * 2L, 0L, 0L, y + p - N2, x + q - N2, ranges);
+                    SplitQuad('C', N2, mino + N4 * 3L, x, 0L, y + p - N2, N2 - x, ranges);
                     break;
                 case 1:
-                    SplitQuad('B', N2, mino + N4 * 2L, 0L, y - N2, p, x + q - N2);
-                    SplitQuad('C', N2, mino + N4 * 3L, x, y - N2, p, N2 - x);
+                    SplitQuad('B', N2, mino + N4 * 2L, 0L, y - N2, p, x + q - N2, ranges);
+                    SplitQuad('C', N2, mino + N4 * 3L, x, y - N2, p, N2 - x, ranges);
                     break;
                 case 2:
-                    SplitQuad('A', N2, mino, x, y, p, N2 - x);
-                    SplitQuad('B', N2, mino + N4 * 1L, 0L, y, p, x + q - N2);
+                    SplitQuad('A', N2, mino, x, y, p, N2 - x, ranges);
+                    SplitQuad('B', N2, mino + N4 * 1L, 0L, y, p, x + q - N2, ranges);
                     break;
                 case 3:
-                    SplitQuad('A', N2, mino, x, y, N2 - y, q);
-                    SplitQuad('C', N2, mino + N4 * 3L, x, 0L, y + p - N2, q);
+                    SplitQuad('A', N2, mino, x, y, N2 - y, q, ranges);
+                    SplitQuad('C', N2, mino + N4 * 3L, x, 0L, y + p - N2, q, ranges);
                     break;
                 case 4:
-                    SplitQuad('B', N2, mino + N4, x - N2, y, N2 - y, q);
-                    SplitQuad('B', N2, mino + N4 * 2L, x - N2, 0L, y + p - N2, q);
+                    SplitQuad('B', N2, mino + N4, x - N2, y, N2 - y, q, ranges);
+                    SplitQuad('B', N2, mino + N4 * 2L, x - N2, 0L, y + p - N2, q, ranges);
                     break;
                 case 5:
-                    SplitQuad('C', N2, mino + N4 * 3L, x, y - N2, p, q);
+                    SplitQuad('C', N2, mino + N4 * 3L, x, y - N2, p, q, ranges);
                     break;
                 case 6:
-                    SplitQuad('B', N2, mino + N4 * 2L, x - N2, y - N2, p, q);
+                    SplitQuad('B', N2, mino + N4 * 2L, x - N2, y - N2, p, q, ranges);
                     break;
                 case 7:
-                    SplitQuad('A', N2, mino, x, y, p, q);
+                    SplitQuad('A', N2, mino, x, y, p, q, ranges);
                     break;
                 case 8:
-                    SplitQuad('B', N2, mino + N4, x - N2, y, p, q);
+                    SplitQuad('B', N2, mino + N4, x - N2, y, p, q, ranges);
                     break;
             }
         }
 
-        private void SplitQuadC(ulong t, ulong mino, ulong x, ulong y, ulong p, ulong q)
+        private void SplitQuadC(ulong t, ulong mino, ulong x, ulong y, ulong p, ulong q, List<ulong[]> ranges)
         {
             ulong N2 = t / 2;
             ulong N4 = N2 * N2;
@@ -666,43 +669,43 @@ namespace Bson.HilbertIndex
             switch (type)
             {
                 case 0:
-                    SplitQuad('D', N2, mino, 0L, 0L, y + p - N2, x + q - N2);
-                    SplitQuad('C', N2, mino + N4, 0L, y, N2 - y, x + q - N2);
-                    SplitQuad('C', N2, mino + N4 * 2L, x, y, N2 - y, N2 - x);
-                    SplitQuad('B', N2, mino + N4 * 3L, x, 0L, y + p - N2, N2 - x);
+                    SplitQuad('D', N2, mino, 0L, 0L, y + p - N2, x + q - N2, ranges);
+                    SplitQuad('C', N2, mino + N4, 0L, y, N2 - y, x + q - N2, ranges);
+                    SplitQuad('C', N2, mino + N4 * 2L, x, y, N2 - y, N2 - x, ranges);
+                    SplitQuad('B', N2, mino + N4 * 3L, x, 0L, y + p - N2, N2 - x, ranges);
                     break;
                 case 1:
-                    SplitQuad('D', N2, mino, 0L, y - N2, p, x + q - N2);
-                    SplitQuad('B', N2, mino + N4 * 3L, x, y - N2, p, N2 - x);
+                    SplitQuad('D', N2, mino, 0L, y - N2, p, x + q - N2, ranges);
+                    SplitQuad('B', N2, mino + N4 * 3L, x, y - N2, p, N2 - x, ranges);
                     break;
                 case 2:
-                    SplitQuad('C', N2, mino + N4, 0L, y, p, x + q - N2);
-                    SplitQuad('C', N2, mino + N4 * 2L, x, y, p, N2 - x);
+                    SplitQuad('C', N2, mino + N4, 0L, y, p, x + q - N2, ranges);
+                    SplitQuad('C', N2, mino + N4 * 2L, x, y, p, N2 - x, ranges);
                     break;
                 case 3:
-                    SplitQuad('C', N2, mino + N4 * 2L, x, y, N2 - y, q);
-                    SplitQuad('B', N2, mino + N4 * 3L, x, 0L, y + p - N2, q);
+                    SplitQuad('C', N2, mino + N4 * 2L, x, y, N2 - y, q, ranges);
+                    SplitQuad('B', N2, mino + N4 * 3L, x, 0L, y + p - N2, q, ranges);
                     break;
                 case 4:
-                    SplitQuad('D', N2, mino, x - N2, 0L, y + p - N2, q);
-                    SplitQuad('C', N2, mino + N4, x - N2, y, N2 - y, q);
+                    SplitQuad('D', N2, mino, x - N2, 0L, y + p - N2, q, ranges);
+                    SplitQuad('C', N2, mino + N4, x - N2, y, N2 - y, q, ranges);
                     break;
                 case 5:
-                    SplitQuad('B', N2, mino + N4 * 3L, x, y - N2, p, q);
+                    SplitQuad('B', N2, mino + N4 * 3L, x, y - N2, p, q, ranges);
                     break;
                 case 6:
-                    SplitQuad('D', N2, mino, x - N2, y - N2, p, q);
+                    SplitQuad('D', N2, mino, x - N2, y - N2, p, q, ranges);
                     break;
                 case 7:
-                    SplitQuad('C', N2, mino + N4 * 2L, x, y, p, q);
+                    SplitQuad('C', N2, mino + N4 * 2L, x, y, p, q, ranges);
                     break;
                 case 8:
-                    SplitQuad('C', N2, mino + N4, x - N2, y, p, q);
+                    SplitQuad('C', N2, mino + N4, x - N2, y, p, q, ranges);
                     break;
             }
         }
 
-        private void SplitQuadD(ulong t, ulong mino, ulong x, ulong y, ulong p, ulong q)
+        private void SplitQuadD(ulong t, ulong mino, ulong x, ulong y, ulong p, ulong q, List<ulong[]> ranges)
         {
             ulong N2 = t / 2;
             ulong N4 = N2 * N2;
@@ -710,38 +713,38 @@ namespace Bson.HilbertIndex
             switch (type)
             {
                 case 0:
-                    SplitQuad('C', N2, mino, 0L, 0L, y + p - N2, x + q - N2);
-                    SplitQuad('D', N2, mino + N4, x, 0L, y + p - N2, N2 - x);
-                    SplitQuad('D', N2, mino + N4 * 2L, x, y, N2 - y, N2 - x);
-                    SplitQuad('A', N2, mino + N4 * 3L, 0L, y, N2 - y, x + q - N2);
+                    SplitQuad('C', N2, mino, 0L, 0L, y + p - N2, x + q - N2, ranges);
+                    SplitQuad('D', N2, mino + N4, x, 0L, y + p - N2, N2 - x, ranges);
+                    SplitQuad('D', N2, mino + N4 * 2L, x, y, N2 - y, N2 - x, ranges);
+                    SplitQuad('A', N2, mino + N4 * 3L, 0L, y, N2 - y, x + q - N2, ranges);
                     break;
                 case 1:
-                    SplitQuad('C', N2, mino, 0L, y - N2, p, x + q - N2);
-                    SplitQuad('D', N2, mino + N4, x, y - N2, p, N2 - x);
+                    SplitQuad('C', N2, mino, 0L, y - N2, p, x + q - N2, ranges);
+                    SplitQuad('D', N2, mino + N4, x, y - N2, p, N2 - x, ranges);
                     break;
                 case 2:
-                    SplitQuad('D', N2, mino + N4 * 2L, x, y, p, N2 - x);
-                    SplitQuad('A', N2, mino + N4 * 3L, 0L, y, p, x + q - N2);
+                    SplitQuad('D', N2, mino + N4 * 2L, x, y, p, N2 - x, ranges);
+                    SplitQuad('A', N2, mino + N4 * 3L, 0L, y, p, x + q - N2, ranges);
                     break;
                 case 3:
-                    SplitQuad('D', N2, mino + N4, x, 0L, y + p - N2, q);
-                    SplitQuad('D', N2, mino + N4 * 2L, x, y, N2 - y, q);
+                    SplitQuad('D', N2, mino + N4, x, 0L, y + p - N2, q, ranges);
+                    SplitQuad('D', N2, mino + N4 * 2L, x, y, N2 - y, q, ranges);
                     break;
                 case 4:
-                    SplitQuad('C', N2, mino, x - N2, 0L, y + p - N2, q);
-                    SplitQuad('A', N2, mino + N4 * 3L, x - N2, y, N2 - y, q);
+                    SplitQuad('C', N2, mino, x - N2, 0L, y + p - N2, q, ranges);
+                    SplitQuad('A', N2, mino + N4 * 3L, x - N2, y, N2 - y, q, ranges);
                     break;
                 case 5:
-                    SplitQuad('D', N2, mino + N4, x, y - N2, p, q);
+                    SplitQuad('D', N2, mino + N4, x, y - N2, p, q, ranges);
                     break;
                 case 6:
-                    SplitQuad('C', N2, mino, x - N2, y - N2, p, q);
+                    SplitQuad('C', N2, mino, x - N2, y - N2, p, q, ranges);
                     break;
                 case 7:
-                    SplitQuad('D', N2, mino + N4 * 2L, x, y, p, q);
+                    SplitQuad('D', N2, mino + N4 * 2L, x, y, p, q, ranges);
                     break;
                 case 8:
-                    SplitQuad('A', N2, mino + N4 * 3L, x - N2, y, p, q);
+                    SplitQuad('A', N2, mino + N4 * 3L, x - N2, y, p, q, ranges);
                     break;
             }
         }
@@ -775,20 +778,19 @@ namespace Bson.HilbertIndex
 
         }
 
-        private void AddRange(ulong min, ulong max)
+        private void AddRange(ulong min, ulong max, List<ulong[]> ranges)
         {
-            if (_ranges == null)
+            if (ranges.Count == 0)
             {
-                _ranges = new List<ulong[]>();
-                _ranges.Add(new[] { min, max });
+                ranges.Add(new[] { min, max });
             }
-            else if (_ranges[_ranges.Count - 1][1] == min - 1)
+            else if (ranges[ranges.Count - 1][1] == min - 1)
             {
-                _ranges[_ranges.Count - 1][1] = max;
+                ranges[ranges.Count - 1][1] = max;
             }
             else
             {
-                _ranges.Add(new[] { min, max });
+                ranges.Add(new[] { min, max });
             }
         }
 
@@ -839,7 +841,7 @@ namespace Bson.HilbertIndex
             var boxes = new List<Box>();
             boxes.Add(box);
 
-            if (!(box.MinX < 0 || box.MinY < 0 || box.MaxX > N - 1 || box.MaxY > N - 1))
+            if (!(box.MinX < 0 || box.MinY < 0 || box.MaxX > _N - 1 || box.MaxY > _N - 1))
                 return boxes;
 
             var tmpboxes = new List<Box>();
@@ -852,7 +854,7 @@ namespace Bson.HilbertIndex
                         tmpboxes.Add(new Box(0, b.MinY, b.height, b.width + b.MinX));
                     }
 
-                    tmpboxes.Add(new Box((N - 1) + b.MinX, b.MinY, b.height, b.MinX * -1));
+                    tmpboxes.Add(new Box((_N - 1) + b.MinX, b.MinY, b.height, b.MinX * -1));
                 }
                 else
                 {
@@ -877,7 +879,7 @@ namespace Bson.HilbertIndex
                     {
                         // dont warp from pole to pole.
                         // todo: spread sideways instead
-                        tmpboxes.Add(new Box(b.MinX, (N - 1) + b.MinY, b.MinY * -1, b.width));
+                        tmpboxes.Add(new Box(b.MinX, (_N - 1) + b.MinY, b.MinY * -1, b.width));
                     }
                 }
                 else
@@ -892,10 +894,10 @@ namespace Bson.HilbertIndex
 
             foreach (Box b in boxes)
             {
-                if (b.MaxX > N - 1)
+                if (b.MaxX > _N - 1)
                 {
-                    tmpboxes.Add(new Box(b.MinX, b.MinY, b.height, (N - 1) - b.MinX));
-                    tmpboxes.Add(new Box(0, b.MinY, b.height, b.MaxX - (N - 1)));
+                    tmpboxes.Add(new Box(b.MinX, b.MinY, b.height, (_N - 1) - b.MinX));
+                    tmpboxes.Add(new Box(0, b.MinY, b.height, b.MaxX - (_N - 1)));
                 }
                 else
                 {
@@ -909,9 +911,9 @@ namespace Bson.HilbertIndex
 
             foreach (Box b in boxes)
             {
-                if (b.MaxY > N - 1)
+                if (b.MaxY > _N - 1)
                 {
-                    tmpboxes.Add(new Box(b.MinX, b.MinY, (N - 1) - b.MinY, b.width));
+                    tmpboxes.Add(new Box(b.MinX, b.MinY, (_N - 1) - b.MinY, b.width));
                     // dont warp from pole to pole.
                     // todo: spread sideways instead
                     //tmpboxes.Add(new box(b.minX, 0, b.maxY - (N - 1), b.width));
@@ -926,7 +928,7 @@ namespace Bson.HilbertIndex
             boxes.AddRange(tmpboxes);
             tmpboxes.Clear();
 
-            boxes.Sort((box1, box2) => PointToIndex(box1.MinX, box1.MinY, N).CompareTo(PointToIndex(box2.MinX, box2.MinY, N)));
+            boxes.Sort((box1, box2) => PointToIndex(box1.MinX, box1.MinY, _N).CompareTo(PointToIndex(box2.MinX, box2.MinY, _N)));
             return boxes;
         }
     }

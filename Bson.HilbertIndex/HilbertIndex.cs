@@ -31,25 +31,15 @@ namespace Bson.HilbertIndex
 
         public IEnumerable<T> Within(Coordinate coordinate, int meters)
         {
-            var searchBox = CoordinateSystems.Wgs84.Buffer(coordinate, meters);
-            var ranges = _hilbertCode.GetRanges(searchBox)
-                .Ranges.OrderBy(pair => pair[0]); // already ordered?
+            var searchEnvelop = CoordinateSystems.Wgs84.Buffer(coordinate, meters);
+            var ranges = _hilbertCode.GetRanges(searchEnvelop).Ranges;
 
             return ExtractItems(_items, ranges)
-                .Select(item => (Item: item, distance: CoordinateSystems.Wgs84.Distance(new Coordinate(item.X, item.Y), coordinate)))
-                .Where(item => item.distance <= meters)
-                .OrderBy(item => item.distance)
+                .Select(item => (Item: item, Distance: CoordinateSystems.Wgs84.Distance(new Coordinate(item.X, item.Y), coordinate)))
+                .Where(item => item.Distance <= meters)
+                .OrderBy(item => item.Distance)
                 .Select(item => item.Item)
                 .Cast<T>();
-
-            // // Super naive aproach which totallly exploaded when having 1M + items
-            // return ranges
-            //     .SelectMany(range => _pois.SkipWhile(p => p.Hid <= range.First()).TakeWhile(p => p.Hid <= range.Last()))
-            //     .Where(p => categories.Any(c => c == p.CategoryId))
-            //     .Select(p => (Poi: p, distance: CoordinateSystems.Wgs84.Distance(new Coordinate(p.Longitude, p.Latitude), coordinate)))
-            //     .Where(p => p.distance <= meters)
-            //     .OrderBy(p => p.distance)
-            //     .Select(p => p.Poi);
         }
 
         private static IEnumerable<IHilbertSearchable> ExtractItems(List<IHilbertSearchable> items, IEnumerable<ulong[]> ranges)
@@ -58,7 +48,7 @@ namespace Bson.HilbertIndex
             // Since we know that the ranges are sorted we don't have to search the whole list every time 
             //  -> continue from end of preious segment stored in startIndex
             int startIndex = 0;
-            foreach (var range in ranges)
+            foreach (var range in ranges.OrderBy(pair => pair[0]))
             {
                 // Can be optimized by using custom bin search algorithm taking a Func<T, int> to do the comparision
                 // Will also get rid of the stupid casting from IHilbertSearchable -> T and we can work on type T all the way
