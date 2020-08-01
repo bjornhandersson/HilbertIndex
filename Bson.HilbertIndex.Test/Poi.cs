@@ -29,7 +29,12 @@ namespace Bson.HilbertIndex.Test
 
         public int CategoryId { get; }
 
+        public override int GetHashCode() => Id.GetHashCode();
+
+        public override bool Equals(object obj) => obj is Poi _poi && _poi.Id == Id;
+
         public static Poi Create(uint id, int categoryId, Coordinate coord)
             => new Poi(id, coord.X, coord.Y, s_hilbertCode.Encode(coord), categoryId);
+
     }
 }

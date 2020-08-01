@@ -217,6 +217,18 @@ namespace Bson.HilbertIndex.Test
             }
             stopWatch.Stop();
             TestContext.WriteLine("Searched in: " + stopWatch.ElapsedMilliseconds);
+
+            stopWatch.Reset();
+            stopWatch.Start();
+            index.Add(new Poi(0, 0, 0, 0, 0));
+            stopWatch.Stop();
+            TestContext.WriteLine("Inserted in: " + stopWatch.ElapsedMilliseconds);
+
+            stopWatch.Reset();
+            stopWatch.Start();
+            index.Remove(testData[testData.Count / 2]);
+            stopWatch.Stop();
+            TestContext.WriteLine("Removed in: " + stopWatch.ElapsedMilliseconds);
         }
 
         private static IEnumerable<Poi> Generate(int number)

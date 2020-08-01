@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.Concurrent;
 using System.Linq;
+using System.Threading;
 
 namespace Bson.HilbertIndex
 {
@@ -14,12 +16,15 @@ namespace Bson.HilbertIndex
 
         private static readonly HilbertComparer s_hilbertComparer = new HilbertComparer();
 
+        private readonly ReaderWriterLockSlim _mutex;
+
         public HilbertIndex(IEnumerable<T> items)
         {
             // Important! IHilbertSearchable are assumed to be sorted by poi.Hid
             //  we can easily populate the cache sorted so don't spend expensive time sorting here and lets assume it's sorted.
             _items = items.Cast<IHilbertIndexable>().ToList();
             _hilbertCode = new HilbertCode();
+            _mutex = new ReaderWriterLockSlim();
         }
 
         public IEnumerable<T> Within(Coordinate coordinate, int meters)
@@ -27,7 +32,11 @@ namespace Bson.HilbertIndex
             var searchEnvelop = GeoUtils.Wgs84.Buffer(coordinate, meters);
             var ranges = _hilbertCode.GetRanges(searchEnvelop);
 
-            return ExtractItems(_items, ranges)
+            var extracted = LockForRead(() => 
+                ExtractItems(_items, ranges)
+                    .ToList() // Evaluate the Linq expression within the lock!
+            );
+            return extracted
                 .Select(item => new { Item = item, Distance = GeoUtils.Wgs84.Distance(new Coordinate(item.X, item.Y), coordinate) })
                 .Where(item => item.Distance <= meters)
                 .OrderBy(item => item.Distance)
@@ -37,34 +46,56 @@ namespace Bson.HilbertIndex
 
         public IEnumerable<T> NearestNeighbours(Coordinate coordinate)
         {
-            ulong search1D = _hilbertCode.Encode(coordinate);
-            int index = _items.BinarySearch(new Searchable(search1D), s_hilbertComparer);
-            
-            ulong neighbour1D = 0;
+            ulong searchId = _hilbertCode.Encode(coordinate);
+            var extracted = LockForRead(() =>
+            {
+                ulong neighbourId = FindNeighbourId(_items, searchId);
+                var ranges = _hilbertCode.GetRanges(searchId, neighbourId);
+                return ExtractItems(_items, ranges)
+                    .ToList(); // evalute the Linq within the lock!
+            });
 
-            if(index > -1)
-            {
-                neighbour1D = _items[index].Hid;
-            }
-            // Matched last
-            else if (~index == _items.Count - 1)
-            {
-                neighbour1D = _items[~index].Hid;
-            }
-            else 
-            {
-                ulong min = _items[~index].Hid;
-                ulong max = _items[~index + 1].Hid;
-                neighbour1D = search1D - max < min - search1D ? max : min;
-            }
-
-            var ranges = _hilbertCode.GetRanges(search1D, neighbour1D);
-            return ExtractItems(_items, ranges)
+            return extracted
                 .Select(item => new { Item = item, Distance = GeoUtils.Wgs84.Distance(new Coordinate(item.X, item.Y), coordinate) })
                 .OrderBy(item => item.Distance)
                 .Select(item => item.Item)
                 .Cast<T>();
         }
+
+        private static ulong FindNeighbourId(List<IHilbertIndexable> items, ulong searchHid)
+        {
+            int index = items.BinarySearch(new Searchable(searchHid), s_hilbertComparer);
+            if (index > -1)
+            {
+                return items[index].Hid;
+            }
+            else if (~index == items.Count - 1)
+            {
+                // Matched last
+                return items[~index].Hid;
+            }
+            else
+            {
+                ulong min = items[~index].Hid;
+                ulong max = items[~index + 1].Hid;
+                return searchHid - max < min - searchHid ? max : min;
+            }
+        }
+
+        public void Add(IHilbertIndexable item)
+        {
+            LockForWrite(() =>
+            {
+                int index = ~_items.BinarySearch(item, s_hilbertComparer);
+                if (index >= _items.Count)
+                    _items.Add(item);
+                else
+                    _items.Insert(index, item);
+            });
+        }
+
+        public void Remove(T item)
+            => LockForWrite(() => _items.Remove(item));
 
         private static IEnumerable<IHilbertIndexable> ExtractItems(List<IHilbertIndexable> items, IEnumerable<ulong[]> ranges)
         {
@@ -87,6 +118,32 @@ namespace Bson.HilbertIndex
 
                 // Store next search start (optimization)
                 startIndex = index;
+            }
+        }
+
+        private T1 LockForRead<T1>(Func<T1> read)
+        {
+            _mutex.EnterReadLock();
+            try
+            {
+                return read();
+            }
+            finally
+            {
+                _mutex.ExitReadLock();
+            }
+        }
+
+        private void LockForWrite(Action write)
+        {
+            _mutex.EnterWriteLock();
+            try
+            {
+                write();
+            }
+            finally
+            {
+                _mutex.ExitWriteLock();
             }
         }
 
