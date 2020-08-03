@@ -39,10 +39,10 @@ namespace Bson.HilbertIndex
         {
             ulong search1D = _hilbertCode.Encode(coordinate);
             int index = _items.BinarySearch(new Searchable(search1D), s_hilbertComparer);
-            
+
             ulong neighbour1D = 0;
 
-            if(index > -1)
+            if (index > -1)
             {
                 neighbour1D = _items[index].Hid;
             }
@@ -51,7 +51,7 @@ namespace Bson.HilbertIndex
             {
                 neighbour1D = _items[~index].Hid;
             }
-            else 
+            else
             {
                 ulong min = _items[~index].Hid;
                 ulong max = _items[~index + 1].Hid;
@@ -79,6 +79,17 @@ namespace Bson.HilbertIndex
 
                 // Find index to start search.
                 int index = items.BinarySearch(startIndex, items.Count - startIndex, searchItem, s_hilbertComparer);
+                
+                // Got exact match. 
+                // To support items having duplicated hilbertIds, we "scan down" to find the first occurence of the matched hid
+                if (index > -1)
+                {
+                    ulong hid = items[index].Hid;
+                    int scanIndex = index - 1;
+                    while(scanIndex >= 0 && items[scanIndex].Hid == hid)
+                        index = scanIndex -= 1;
+                }
+
                 index = index < 0 ? ~index : index;
 
                 // Take items while Hilbert number is less than the range end

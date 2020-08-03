@@ -146,6 +146,36 @@ namespace Bson.HilbertIndex.Test
         }
 
         [Test]
+        public void Test_Index_Should_Support_Duplicated_HilbertIds()
+        {
+            //
+            // Arange
+
+            // Init search structure (cache/index/whatever)
+
+            var testData = new List<Poi>{
+                Poi.Create(1, 1, new Coordinate(18.000000001, 57.000000001)),
+                Poi.Create(2, 1, new Coordinate(18.000000002, 57.000000002)),
+                Poi.Create(3, 1, new Coordinate(18.000000003, 57.000000003)),
+            }.OrderBy(p => p.Hid);
+
+            var firstHid = new HilbertCode().Encode(new Coordinate(18.000000001, 57.000000001));
+
+            Assert.IsTrue(testData.All(poi => poi.Hid == firstHid), "Expected same Hid");
+
+            var index = new HilbertIndex<Poi>(testData);
+
+            var firstItem = testData.First();
+            var exactMatch = new Coordinate(firstItem.X, firstItem.Y);
+
+            //
+            // Act
+            var hit = index.Within(exactMatch, meters: 10).First();
+            Assert.AreEqual(firstItem.Id, hit.Id);
+        }
+
+
+        [Test]
         public void Index_can_Find_Nearest_Neighbour()
         {
             var testData = new List<Poi>{
