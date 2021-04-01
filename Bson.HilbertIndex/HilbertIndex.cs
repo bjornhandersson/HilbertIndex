@@ -37,6 +37,11 @@ namespace Bson.HilbertIndex
 
         public IEnumerable<T> NearestNeighbours(Coordinate coordinate)
         {
+            if (!_items.Any())
+            {
+                return Enumerable.Empty<T>();
+            }
+
             ulong search1D = _hilbertCode.Encode(coordinate);
             int index = _items.BinarySearch(new Searchable(search1D), s_hilbertComparer);
 
@@ -46,10 +51,10 @@ namespace Bson.HilbertIndex
             {
                 neighbour1D = _items[index].Hid;
             }
-            // Matched last
-            else if (~index == _items.Count - 1)
+            // Matched last (or last + 1 meaning)
+            else if (~index >= _items.Count - 1)
             {
-                neighbour1D = _items[~index].Hid;
+                neighbour1D = _items[_items.Count - 1].Hid;
             }
             else
             {
@@ -79,14 +84,14 @@ namespace Bson.HilbertIndex
 
                 // Find index to start search.
                 int index = items.BinarySearch(startIndex, items.Count - startIndex, searchItem, s_hilbertComparer);
-                
+
                 // Got exact match. 
                 // To support items having duplicated hilbertIds, we "scan down" to find the first occurence of the matched hid
                 if (index > -1)
                 {
                     ulong hid = items[index].Hid;
                     int scanIndex = index - 1;
-                    while(scanIndex >= 0 && items[scanIndex].Hid == hid)
+                    while (scanIndex >= 0 && items[scanIndex].Hid == hid)
                         index = scanIndex -= 1;
                 }
 
