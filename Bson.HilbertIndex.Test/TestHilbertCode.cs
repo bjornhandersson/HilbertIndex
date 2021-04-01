@@ -6,6 +6,7 @@ using System.Collections.Generic;
 
 namespace Bson.HilbertIndex.Test
 {
+    [TestFixture]
     public class Tests
     {
         [SetUp]
@@ -247,6 +248,32 @@ namespace Bson.HilbertIndex.Test
             }
             stopWatch.Stop();
             TestContext.WriteLine("Searched in: " + stopWatch.ElapsedMilliseconds);
+        }
+
+        [Test]
+        public void Index_Should_Handle_Searches_In_One_Item_Collection()
+        {
+            var index = new HilbertIndex<Poi>(new List<Poi> {
+                Poi.Create(id:1, categoryId: 1, new Coordinate(18.108183, 59.255583))
+            });
+
+            var result = index.NearestNeighbours(new Coordinate(18.11139, 59.25455));
+            Assert.AreEqual(1, result.Count());
+
+            result = index.Within(new Coordinate(18.11139, 59.25455), meters: 1000);
+            Assert.AreEqual(1, result.Count());
+        }
+
+        [Test]
+        public void Index_Should_Handle_Searches_In_Empty_Collection()
+        {
+            var index = new HilbertIndex<Poi>(new List<Poi>());
+
+            var result = index.NearestNeighbours(new Coordinate(18.11139, 59.25455));
+            Assert.IsEmpty(result);
+
+            result = index.Within(new Coordinate(18.11139, 59.25455), meters: 1000);
+            Assert.IsEmpty(result);
         }
 
         private static IEnumerable<Poi> Generate(int number)
