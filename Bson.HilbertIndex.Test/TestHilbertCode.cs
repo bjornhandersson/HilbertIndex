@@ -9,11 +9,6 @@ namespace Bson.HilbertIndex.Test
     [TestFixture]
     public class Tests
     {
-        [SetUp]
-        public void Setup()
-        {
-        }
-
         [Test]
         public void GetRange_Should_Give_Ranges_For_Position()
         {

@@ -14,14 +14,24 @@ namespace Bson.HilbertIndex
 
         private static readonly HilbertComparer s_hilbertComparer = new HilbertComparer();
 
+        /// <summary>
+        /// Create a new index with a set of IHilbertIndexable
+        /// </summary>
+        /// <param name="items">A set of IHilbertIndexable sorted according to IHilbertIndexable.Hid</param>
         public HilbertIndex(IEnumerable<T> items)
         {
-            // Important! IHilbertSearchable are assumed to be sorted by poi.Hid
+            // Important! IHilbertSearchable are assumed to be sorted by IHilbertIndexable.Hid
             //  we can easily populate the cache sorted so don't spend expensive time sorting here and lets assume it's sorted.
             _items = items.Cast<IHilbertIndexable>().ToList();
             _hilbertCode = new HilbertCode();
         }
 
+        /// <summary>
+        /// Find items within the given distance in meter from the given Coordinate
+        /// </summary>
+        /// <param name="coordinate">Coordinate center of the search</param>
+        /// <param name="meters">Distance in meters from the given coordinate to search</param>
+        /// <returns>A set of IHilbertIndexable matcing the search ordered by distance according to Wgs84</returns>
         public IEnumerable<T> Within(Coordinate coordinate, int meters)
         {
             var searchEnvelop = GeoUtils.Wgs84.Buffer(coordinate, meters);
@@ -35,6 +45,12 @@ namespace Bson.HilbertIndex
                 .Cast<T>();
         }
 
+        /// <summary>
+        /// Find the nearest neighbours to a given coordinate regardless of the distance.
+        /// If more than one neighbour is found in the hilbet space, the result is sorted by Wgs84 distance, where the nearest is is first.
+        /// </summary>
+        /// <param name="coordinate">Coordinate of the search</param>
+        /// <returns>A set of IHilbertIndexable matcing the search ordered by distance according to Wgs84</returns>
         public IEnumerable<T> NearestNeighbours(Coordinate coordinate)
         {
             if (!_items.Any())

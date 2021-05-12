@@ -43,9 +43,19 @@ namespace Bson.HilbertIndex
             => $"xy:{_x},{_y} p:{_p},q:{_q}";
 
         public override int GetHashCode()
-            => (_x << _y) ^ (_p << _q);
+        {
+            int hash = 31;
+			hash = hash * 23 + _x.GetHashCode();
+			hash = hash * 23 + _y.GetHashCode();
+            hash = hash * 23 + _q.GetHashCode();
+            hash = hash * 23 + _p.GetHashCode();
+			return hash;
+        }
 
-        public override bool Equals(object obj)
-            => obj is HilbertEnvelope && obj.GetHashCode() == this.GetHashCode();
+        public override bool Equals(object obj) => obj switch
+        {
+            HilbertEnvelope env => env._x == _x && env._y == _y && env._q == _q && env._p == _p,
+            _ => false  
+        };
     }
 }
