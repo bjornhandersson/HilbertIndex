@@ -37,7 +37,7 @@ namespace Bson.HilbertIndex
             public static Coordinate Move(Coordinate origin, double meters, double bearing)
             {
                 // Todo: Improve precision here.
-                // meters as fractions of radious of earth is... tiny consider using decimla type (128 bit vs 64 for a double)
+                // meters as fractions of radious of earth is... tiny.
                 meters /= EARTH_RADIOUS;
 
                 double e1 = origin.X * Math.PI / 180.0;
