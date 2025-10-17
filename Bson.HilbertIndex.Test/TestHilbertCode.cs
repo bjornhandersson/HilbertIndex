@@ -1,5 +1,4 @@
 using NUnit.Framework;
-using Bson.HilbertIndex;
 using System;
 using System.Linq;
 using System.Collections.Generic;
@@ -17,17 +16,17 @@ namespace Bson.HilbertIndex.Test
             // Search target
             ulong hid = indexer.Encode(new Coordinate(18, 57));
 
-            // Envelope arround search bound 
+            // Envelope around search bounds
             var searchEnvelope = new Envelope(17.99999, 18.00009, 56.99999, 57.00001);
 
-            // Find ranges to search for, providing the seach bounds
+            // Find ranges to search for, providing the search bounds
             var ranges = indexer.GetRanges(searchEnvelope);
 
             // Find if the search target is within the ranges of our search target
             bool found = ranges.Any(range => hid >= range[0] && hid <= range[1]);
 
             // Should be
-            Assert.IsTrue(found);
+            Assert.That(found, Is.True);
         }
 
         [Test]
@@ -44,24 +43,24 @@ namespace Bson.HilbertIndex.Test
             // Create a search envelope (box) extending 1000 meters from the search point (tolerance)
             var hitEnvelope = GeoUtils.Wgs84.Buffer(searchCoord, meters: 1000);
 
-            // Assert the Hilbert index provides ut with the ranges we need to search to find our coordinate when
-            // given the envelop including the coorindate of our target.
+            // Assert the Hilbert index provides us with the ranges we need to search to find our coordinate when
+            // given the envelope including the coordinate of our target.
             bool found = indexer.GetRanges(hitEnvelope).Any(range => indexToFind.Between(range));
-            Assert.IsTrue(found);
+            Assert.That(found, Is.True);
 
             // Create a search envelope that should not include the coord we're looking for
             var missEnvelope = GeoUtils.Wgs84.Buffer(searchCoord, meters: 900);
 
             // Expect a miss
             bool notFound = indexer.GetRanges(missEnvelope).Any(range => indexToFind.Between(range));
-            Assert.IsFalse(notFound);
+            Assert.That(notFound, Is.False);
         }
 
         [Test]
         public void Will_Hit_Cache()
         {
             //
-            // Arange
+            // Arrange
 
             // Init search structure (cache/index/whatever)
             var index = new HilbertIndex<Poi>(new List<Poi>{
@@ -84,15 +83,15 @@ namespace Bson.HilbertIndex.Test
             //
             // Assert
             var distance = GeoUtils.Wgs84.Distance(new Coordinate(hit.X, hit.Y), search);
-            Assert.AreEqual(2, hit.Id);
-            Assert.IsTrue(distance < toleranceMeters);
+            Assert.That(hit.Id, Is.EqualTo(2));
+            Assert.That(distance < toleranceMeters, Is.True);
         }
 
         [Test]
         public void Should_Find_Exact_Match()
         {
             //
-            // Arange
+            // Arrange
 
             // Init search structure (cache/index/whatever)
 
@@ -111,7 +110,7 @@ namespace Bson.HilbertIndex.Test
         public void Test_Index_Should_Find_Edges()
         {
             //
-            // Arange
+            // Arrange
 
             // Init search structure (cache/index/whatever)
 
@@ -135,17 +134,17 @@ namespace Bson.HilbertIndex.Test
             //
             // Act
             var firstHit = index.Within(firstSearch, toleranceMeters).First();
-            Assert.AreEqual(firstItem.Id, firstHit.Id);
+            Assert.That(firstHit.Id, Is.EqualTo(firstItem.Id));
 
             var lastHit = index.Within(lastSearch, toleranceMeters).First();
-            Assert.AreEqual(lastItem.Id, lastHit.Id);
+            Assert.That(lastHit.Id, Is.EqualTo(lastItem.Id));
         }
 
         [Test]
         public void Test_Index_Should_Support_Duplicated_HilbertIds()
         {
             //
-            // Arange
+            // Arrange
 
             // Init search structure (cache/index/whatever)
 
@@ -157,7 +156,7 @@ namespace Bson.HilbertIndex.Test
 
             var firstHid = new HilbertCode().Encode(new Coordinate(18.000000001, 57.000000001));
 
-            Assert.IsTrue(testData.All(poi => poi.Hid == firstHid), "Expected same Hid");
+            Assert.That(testData.All(poi => poi.Hid == firstHid), Is.True, "Expected same Hid");
 
             var index = new HilbertIndex<Poi>(testData);
 
@@ -167,7 +166,7 @@ namespace Bson.HilbertIndex.Test
             //
             // Act
             var hit = index.Within(exactMatch, meters: 10).First();
-            Assert.AreEqual(firstItem.Id, hit.Id);
+            Assert.That(hit.Id, Is.EqualTo(firstItem.Id));
         }
 
 
@@ -183,36 +182,36 @@ namespace Bson.HilbertIndex.Test
             var index = new HilbertIndex<Poi>(testData);
 
             var neareast = index.NearestNeighbours(new Coordinate(18.0001, 57.0001)).First();
-            Assert.AreEqual(1, neareast.Id);
+            Assert.That(neareast.Id, Is.EqualTo(1));
 
             neareast = index.NearestNeighbours(new Coordinate(18.2001, 57.0001)).First();
-            Assert.AreEqual(2, neareast.Id);
+            Assert.That(neareast.Id, Is.EqualTo(2));
 
             neareast = index.NearestNeighbours(new Coordinate(18.5001, 57.0001)).First();
-            Assert.AreEqual(3, neareast.Id);
+            Assert.That(neareast.Id, Is.EqualTo(3));
 
             // Test exact at edges
             neareast = index.NearestNeighbours(new Coordinate(18, 57)).First();
-            Assert.AreEqual(1, neareast.Id);
+            Assert.That(neareast.Id, Is.EqualTo(1));
 
             neareast = index.NearestNeighbours(new Coordinate(18.5, 57)).First();
-            Assert.AreEqual(3, neareast.Id);
+            Assert.That(neareast.Id, Is.EqualTo(3));
 
             var far_a_way = new Coordinate(-74, 41);
 
-            // Coord in New Yourk should be closest to the most western
+            // Coord in New York should be closest to the most western
             neareast = index.NearestNeighbours(new Coordinate(-74, 41)).First();
-            Assert.AreEqual(1, neareast.Id);
+            Assert.That(neareast.Id, Is.EqualTo(1));
         }
 
         [Test]
-        public void Index_Should_Performe_On_Large_Collections()
+        public void Index_Should_Perform_On_Large_Collections()
         {
             var random = new Random();
             var stopWatch = new System.Diagnostics.Stopwatch();
 
             //
-            // Arange
+            // Arrange
 
             TestContext.WriteLine("Memory before: " + System.Diagnostics.Process.GetCurrentProcess().WorkingSet64);
 
@@ -253,10 +252,10 @@ namespace Bson.HilbertIndex.Test
             });
 
             var result = index.NearestNeighbours(new Coordinate(18.11139, 59.25455));
-            Assert.AreEqual(1, result.Count());
+            Assert.That(result.Count(), Is.EqualTo(1));
 
             result = index.Within(new Coordinate(18.11139, 59.25455), meters: 1000);
-            Assert.AreEqual(1, result.Count());
+            Assert.That(result.Count(), Is.EqualTo(1));
         }
 
         [Test]
@@ -265,10 +264,10 @@ namespace Bson.HilbertIndex.Test
             var index = new HilbertIndex<Poi>(new List<Poi>());
 
             var result = index.NearestNeighbours(new Coordinate(18.11139, 59.25455));
-            Assert.IsEmpty(result);
+            Assert.That(result, Is.Empty);
 
             result = index.Within(new Coordinate(18.11139, 59.25455), meters: 1000);
-            Assert.IsEmpty(result);
+            Assert.That(result, Is.Empty);
         }
 
         private static IEnumerable<Poi> Generate(int number)

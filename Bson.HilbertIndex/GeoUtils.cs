@@ -13,11 +13,11 @@ namespace Bson.HilbertIndex
         {
             private const int EARTH_RADIOUS = 6366710;
 
-            // Crete an envelope buffered around the given coordnate to the given distance in meter in true spheric distance
+            // Create an envelope buffered around the given coordinate to the given distance in meter in true spheric distance
             public static Envelope Buffer(Coordinate coordinate, int meters)
             {
-                // Todo: Do proper Mafs
-                //  does not deal with datum line and can be more efficent without Min/Max functions
+                // Todo: Do proper Math
+                //  does not deal with datum line and can be more efficient without Min/Max functions
                 var n = Move(coordinate, meters, 0);
                 var e = Move(coordinate, meters, 90);
                 var s = Move(coordinate, meters, 180);
@@ -31,13 +31,13 @@ namespace Bson.HilbertIndex
             }
 
             // Distance between two wgs84 coordinates 
-            public static double Distance(Coordinate firs, Coordinate second)
-                => DistanceRadians(firs, second) * EARTH_RADIOUS;
+            public static double Distance(Coordinate first, Coordinate second)
+                => DistanceRadians(first, second) * EARTH_RADIOUS;
 
             public static Coordinate Move(Coordinate origin, double meters, double bearing)
             {
                 // Todo: Improve precision here.
-                // meters as fractions of radious of earth is... tiny.
+                // meters as fractions of radius of earth is... tiny.
                 meters /= EARTH_RADIOUS;
 
                 double e1 = origin.X * Math.PI / 180.0;

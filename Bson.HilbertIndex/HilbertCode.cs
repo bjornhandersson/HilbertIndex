@@ -16,7 +16,7 @@ namespace Bson.HilbertIndex
             LOW = 10,
 
             /// <summary>
-            /// Max resolution that still fitts in 32bit int.
+            /// Max resolution that still fits in 32bit int.
             /// 650x650 grid
             /// </summary>
             MEDIUM = 16,
@@ -89,7 +89,7 @@ namespace Bson.HilbertIndex
 
         /// <summary>
         /// returns the hilbert number for the point in the hilbert coordinate systems.
-        /// Coordinate system has 0.0 in lower left corner and ends with 2 ^ CurveOrder - 1 in upper left corner.
+        /// Coordinate system has 0,0 in lower left corner and ends with 2 ^ CurveOrder - 1 in upper right corner.
         /// </summary>
         /// <param name="x">x</param>
         /// <param name="y">y</param>
@@ -104,7 +104,7 @@ namespace Bson.HilbertIndex
         /// <returns>Coordinate representing the hilbert number</returns>
         public Coordinate Decode(ulong d)
         {
-            DecodeoPoint(_N, d, out int x, out int y);
+            DecodeToPoint(_N, d, out int x, out int y);
             _projection.PointToPosition(out var position, x, y, _N - 1);
             return position;
         }
@@ -116,7 +116,7 @@ namespace Bson.HilbertIndex
         /// <param name="x"></param>
         /// <param name="y"></param>
         public void Decode(ulong d, out int x, out int y)
-            => DecodeoPoint(_N, d, out x, out y);
+            => DecodeToPoint(_N, d, out x, out y);
         
         /// <summary>
         /// Get ranges and bounds for nearest neighbour search
@@ -137,7 +137,7 @@ namespace Bson.HilbertIndex
         /// <param name="envelope">Envelope  to get hilbert indices for</param>
         /// <param name="maxRanges">
         /// max number of returned ranges. 
-        /// Number less than zero will return as many ranges required to cover the box with no overlapp.
+        /// Number less than zero will return as many ranges required to cover the box with no overlap.
         /// If greater than zero, the ranges closest to each other will be joined as one until the total number of ranges is less than the specifies maxRange parameter. 
         /// The smaller number, the larger will the bounding box be. 128 is a good number to keep good precision.
         /// </param>
@@ -147,7 +147,7 @@ namespace Bson.HilbertIndex
         
 
         /// <summary>
-        /// Get ranges of hilbert indices within the  given hilbert enveloper. 
+        /// Get ranges of hilbert indices within the given hilbert envelope.
         /// </summary>
         /// <param name="x">x coordinate of lower left corner</param>
         /// <param name="y">y coordinate of lower left corner</param>
@@ -159,7 +159,7 @@ namespace Bson.HilbertIndex
         
 
         /// <summary>
-        /// Get the bounding box for the given ranges of hilber indices.
+        /// Get the bounding box for the given ranges of hilbert indices.
         /// </summary>
         /// <param name="ranges">array of size [n][2]</param>
         /// <returns>bounding box</returns>
@@ -217,7 +217,7 @@ namespace Bson.HilbertIndex
             return d;
         }
 
-        private static void DecodeoPoint(int n, ulong d, out int x, out int y)
+        private static void DecodeToPoint(int n, ulong d, out int x, out int y)
         {
             int rx, ry, s = 0;
             ulong t = d;
@@ -250,7 +250,7 @@ namespace Bson.HilbertIndex
 
         /// <summary>
         /// Create a hilbert box from a bounding box.
-        /// The hilbert box is represenmteed by a point (x,y) in hilbert coordinate system placed at the lower left corner with height (p) and width (q)
+        /// The hilbert box is represented by a point (x,y) in hilbert coordinate system placed at the lower left corner with height (p) and width (q)
         /// </summary> 
         /// <param name="envelope"></param>
         /// <param name="x"></param>
@@ -513,7 +513,7 @@ namespace Bson.HilbertIndex
             ulong T2 = t / 2;
 
             // each window can be derived to 9 types 
-            // (windows intersect all 4 sub-quad, interset upper half 2 sub-quad, intersecting  bottom 2 sub-qaud, left 2 ..., right 2 ..., 4x single quad)
+            // (windows intersect all 4 sub-quad, intersect upper half 2 sub-quad, intersecting bottom 2 sub-quad, left 2 ..., right 2 ..., 4x single quad)
             if (x < T2 && y < T2 && (x + q) >= T2 && (y + p) >= T2)
                 return 0;
             else if (x < T2 && y >= T2 && (x + q) >= T2 && (y + p) >= T2)
@@ -559,7 +559,7 @@ namespace Bson.HilbertIndex
             if (ranges.Length == 0)
                 throw new ArgumentException("Ranges cannot have a length of 0");
 
-            // store the value of next min intervall found in range which is greater than iMinTolerance
+            // store the value of next min interval found in range which is greater than iMinTolerance
             ulong minTolerance = 1;
             ulong nextMin = ulong.MaxValue;
             int currentLength = ranges.Length;
