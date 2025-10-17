@@ -31,7 +31,7 @@ namespace Bson.HilbertIndex
         /// </summary>
         /// <param name="coordinate">Coordinate center of the search</param>
         /// <param name="meters">Distance in meters from the given coordinate to search</param>
-        /// <returns>A set of IHilbertIndexable matcing the search ordered by distance according to Wgs84</returns>
+        /// <returns>A set of IHilbertIndexable matching the search ordered by distance according to Wgs84</returns>
         public IEnumerable<T> Within(Coordinate coordinate, int meters)
         {
             var searchEnvelop = GeoUtils.Wgs84.Buffer(coordinate, meters);
@@ -47,10 +47,10 @@ namespace Bson.HilbertIndex
 
         /// <summary>
         /// Find the nearest neighbours to a given coordinate regardless of the distance.
-        /// If more than one neighbour is found in the hilbet space, the result is sorted by Wgs84 distance, where the nearest is is first.
+        /// If more than one neighbour is found in the hilbert space, the result is sorted by Wgs84 distance, where the nearest is first.
         /// </summary>
         /// <param name="coordinate">Coordinate of the search</param>
-        /// <returns>A set of IHilbertIndexable matcing the search ordered by distance according to Wgs84</returns>
+        /// <returns>A set of IHilbertIndexable matching the search ordered by distance according to Wgs84</returns>
         public IEnumerable<T> NearestNeighbours(Coordinate coordinate)
         {
             if (!_items.Any())
@@ -90,11 +90,11 @@ namespace Bson.HilbertIndex
         private static IEnumerable<IHilbertIndexable> ExtractItems(List<IHilbertIndexable> items, IEnumerable<ulong[]> ranges)
         {
             // Since we know that the ranges are sorted we don't have to search the whole list every time 
-            //  -> continue from end of preious segment stored in startIndex
+            //  -> continue from end of previous segment stored in startIndex
             int startIndex = 0;
             foreach (var range in ranges.OrderBy(pair => pair[0]))
             {
-                // Can be optimized by using custom bin search algorithm taking a Func<T, int> to do the comparision
+                // Can be optimized by using custom bin search algorithm taking a Func<T, int> to do the comparison
                 // Will also get rid of the stupid casting from IHilbertSearchable -> T and we can work on type T all the way
                 var searchItem = new Searchable(hid: range[0]);
 
@@ -102,7 +102,7 @@ namespace Bson.HilbertIndex
                 int index = items.BinarySearch(startIndex, items.Count - startIndex, searchItem, s_hilbertComparer);
 
                 // Got exact match. 
-                // To support items having duplicated hilbertIds, we "scan down" to find the first occurence of the matched hid
+                // To support items having duplicated hilbertIds, we "scan down" to find the first occurrence of the matched hid
                 if (index > -1)
                 {
                     ulong hid = items[index].Hid;
