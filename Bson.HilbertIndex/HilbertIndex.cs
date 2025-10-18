@@ -46,8 +46,8 @@ namespace Bson.HilbertIndex
         }
 
         /// <summary>
-        /// Find the nearest neighbours to a given coordinate regardless of the distance.
-        /// If more than one neighbour is found in the hilbert space, the result is sorted by Wgs84 distance, where the nearest is first.
+        /// Find the nearest neighbors to a given coordinate regardless of the distance.
+        /// If more than one neighbor is found in the hilbert space, the result is sorted by Wgs84 distance, where the nearest is first.
         /// </summary>
         /// <param name="coordinate">Coordinate of the search</param>
         /// <returns>A set of IHilbertIndexable matching the search ordered by distance according to Wgs84</returns>
@@ -61,30 +61,41 @@ namespace Bson.HilbertIndex
             ulong search1D = _hilbertCode.Encode(coordinate);
             int index = _items.BinarySearch(new Searchable(search1D), s_hilbertComparer);
 
-            ulong neighbour1D = 0;
+            ulong neighbor1D = 0;
 
             if (index > -1)
             {
-                neighbour1D = _items[index].Hid;
+                neighbor1D = _items[index].Hid;
             }
             // Matched last (or last + 1 meaning)
             else if (~index >= _items.Count - 1)
             {
-                neighbour1D = _items[_items.Count - 1].Hid;
+                neighbor1D = _items[_items.Count - 1].Hid;
             }
             else
             {
                 ulong min = _items[~index].Hid;
                 ulong max = _items[~index + 1].Hid;
-                neighbour1D = search1D - max < min - search1D ? max : min;
+                neighbor1D = search1D - max < min - search1D ? max : min;
             }
 
-            var ranges = _hilbertCode.GetRanges(search1D, neighbour1D);
+            var ranges = _hilbertCode.GetRanges(search1D, neighbor1D);
             return ExtractItems(_items, ranges)
                 .Select(item => new { Item = item, Distance = GeoUtils.Wgs84.Distance(new Coordinate(item.X, item.Y), coordinate) })
                 .OrderBy(item => item.Distance)
                 .Select(item => item.Item)
                 .Cast<T>();
+        }
+
+        /// <summary>
+        /// Find the nearest neighbors to a given coordinate regardless of the distance.
+        /// If more than one neighbor is found in the hilbert space, the result is sorted by Wgs84 distance, where the nearest is first.
+        /// </summary>
+        /// <param name="coordinate">Coordinate of the search</param>
+        /// <returns>A set of IHilbertIndexable matching the search ordered by distance according to Wgs84</returns>
+        public IEnumerable<T> NearestNeighbors(Coordinate coordinate)
+        {
+            return NearestNeighbours(coordinate);
         }
 
         private static IEnumerable<IHilbertIndexable> ExtractItems(List<IHilbertIndexable> items, IEnumerable<ulong[]> ranges)

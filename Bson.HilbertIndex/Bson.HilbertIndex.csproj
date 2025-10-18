@@ -8,7 +8,7 @@
 
   <PropertyGroup>
     <PackageDescription>
-    Library containing a simple hilbert based spatial index for NearestNeighbour and Within type of queries over a set of points.
+    Library containing a simple hilbert based spatial index for NearestNeighbor and Within type of queries over a set of points.
     </PackageDescription>
     <PackageTags>library;spatial;geo;hilbert;C#</PackageTags>
     <PackageProjectUrl>https://github.com/bjornhandersson/HilbertIndex</PackageProjectUrl>

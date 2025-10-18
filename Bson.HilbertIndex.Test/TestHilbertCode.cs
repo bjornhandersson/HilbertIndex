@@ -171,7 +171,7 @@ namespace Bson.HilbertIndex.Test
 
 
         [Test]
-        public void Index_can_Find_Nearest_Neighbour()
+        public void Index_can_Find_Nearest_Neighbor()
         {
             var testData = new List<Poi>{
                 Poi.Create(1, 1, new Coordinate(18, 57)),
@@ -181,27 +181,27 @@ namespace Bson.HilbertIndex.Test
 
             var index = new HilbertIndex<Poi>(testData);
 
-            var neareast = index.NearestNeighbours(new Coordinate(18.0001, 57.0001)).First();
-            Assert.That(neareast.Id, Is.EqualTo(1));
+            var nearest = index.NearestNeighbors(new Coordinate(18.0001, 57.0001)).First();
+            Assert.That(nearest.Id, Is.EqualTo(1));
 
-            neareast = index.NearestNeighbours(new Coordinate(18.2001, 57.0001)).First();
-            Assert.That(neareast.Id, Is.EqualTo(2));
+            nearest = index.NearestNeighbors(new Coordinate(18.2001, 57.0001)).First();
+            Assert.That(nearest.Id, Is.EqualTo(2));
 
-            neareast = index.NearestNeighbours(new Coordinate(18.5001, 57.0001)).First();
-            Assert.That(neareast.Id, Is.EqualTo(3));
+            nearest = index.NearestNeighbors(new Coordinate(18.5001, 57.0001)).First();
+            Assert.That(nearest.Id, Is.EqualTo(3));
 
             // Test exact at edges
-            neareast = index.NearestNeighbours(new Coordinate(18, 57)).First();
-            Assert.That(neareast.Id, Is.EqualTo(1));
+            nearest = index.NearestNeighbors(new Coordinate(18, 57)).First();
+            Assert.That(nearest.Id, Is.EqualTo(1));
 
-            neareast = index.NearestNeighbours(new Coordinate(18.5, 57)).First();
-            Assert.That(neareast.Id, Is.EqualTo(3));
+            nearest = index.NearestNeighbors(new Coordinate(18.5, 57)).First();
+            Assert.That(nearest.Id, Is.EqualTo(3));
 
             var far_a_way = new Coordinate(-74, 41);
 
             // Coord in New York should be closest to the most western
-            neareast = index.NearestNeighbours(new Coordinate(-74, 41)).First();
-            Assert.That(neareast.Id, Is.EqualTo(1));
+            nearest = index.NearestNeighbors(new Coordinate(-74, 41)).First();
+            Assert.That(nearest.Id, Is.EqualTo(1));
         }
 
         [Test]
@@ -251,7 +251,7 @@ namespace Bson.HilbertIndex.Test
                 Poi.Create(id:1, categoryId: 1, new Coordinate(18.108183, 59.255583))
             });
 
-            var result = index.NearestNeighbours(new Coordinate(18.11139, 59.25455));
+            var result = index.NearestNeighbors(new Coordinate(18.11139, 59.25455));
             Assert.That(result.Count(), Is.EqualTo(1));
 
             result = index.Within(new Coordinate(18.11139, 59.25455), meters: 1000);
@@ -263,7 +263,7 @@ namespace Bson.HilbertIndex.Test
         {
             var index = new HilbertIndex<Poi>(new List<Poi>());
 
-            var result = index.NearestNeighbours(new Coordinate(18.11139, 59.25455));
+            var result = index.NearestNeighbors(new Coordinate(18.11139, 59.25455));
             Assert.That(result, Is.Empty);
 
             result = index.Within(new Coordinate(18.11139, 59.25455), meters: 1000);
