@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Linq;
 using System.Collections.Generic;
 
 namespace Bson.HilbertIndex
@@ -119,10 +118,10 @@ namespace Bson.HilbertIndex
             => DecodeToPoint(_N, d, out x, out y);
         
         /// <summary>
-        /// Get ranges and bounds for nearest neighbour search
+        /// Get ranges and bounds for nearest neighbor search
         /// </summary>
         /// <param name="search1D">Key of search point</param>
-        /// <param name="neighbour1D">Nearest one dimensional neighbour</param>
+        /// <param name="neighbour1D">Nearest one dimensional neighbor</param>
         /// <returns></returns>
         public ulong[][] GetRanges(ulong search1D, ulong neighbour1D, int maxRanges = DefaultRangeCompactation)
         {
